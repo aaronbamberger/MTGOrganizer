@@ -34,7 +34,8 @@ func main() {
 	numCards := 0
 	fmt.Printf("Number of sets retrieved: %d\n", len(allSets))
 	for code, set := range allSets {
-		fmt.Printf("Number of cards in set %s (%s): %d\n", code, set.Name, len(set.Cards))
+		fmt.Printf("Set %s (%s):\n", code, set.Name)
+		fmt.Printf("\tNumber of cards in set: %d\n", len(set.Cards))
 		numCards += len(set.Cards)
 	}
 	fmt.Printf("Total cards retrieved: %d\n", numCards)
