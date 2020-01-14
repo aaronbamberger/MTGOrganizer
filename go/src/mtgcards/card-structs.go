@@ -4,6 +4,7 @@ import "encoding/binary"
 import "fmt"
 import "hash"
 import "hash/fnv"
+import "sort"
 import "strings"
 
 type MTGSet struct {
@@ -28,6 +29,43 @@ type MTGSet struct {
 	Type string `json:"type"`
 }
 
+func (set MTGSet) Canonicalize() {
+	// TODO: Sort cards by UUID
+	for _, card := range set.Cards {
+		card.Canonicalize()
+	}
+}
+
+func (set MTGSet) SetHash() hash.Hash {
+	hashRes := fnv.New128a()
+	binary.Write(hashRes, binary.BigEndian, set.BaseSetSize)
+	hashRes.Write([]byte(set.Block))
+	for _, card := range set.Cards {
+		cardHash := card.CardHash()
+		cardHashBytes := make([]byte, 0, cardHash.Size())
+		hashRes.Write(cardHash.Sum(cardHashBytes))
+	}
+	hashRes.Write([]byte(set.Code))
+	binary.Write(hashRes, binary.BigEndian, set.IsForeignOnly)
+	binary.Write(hashRes, binary.BigEndian, set.IsFoilOnly)
+	binary.Write(hashRes, binary.BigEndian, set.IsOnlineOnly)
+	binary.Write(hashRes, binary.BigEndian, set.IsPartialPreview)
+	hashRes.Write([]byte(set.KeyruneCode))
+	hashRes.Write([]byte(set.MCMName))
+	binary.Write(hashRes, binary.BigEndian, set.MCMId)
+	hashRes.Write([]byte(set.MTGOCode))
+	hashRes.Write([]byte(set.Name))
+	hashRes.Write([]byte(set.ParentCode))
+	hashRes.Write([]byte(set.ReleaseDate))
+	binary.Write(hashRes, binary.BigEndian, set.TCGPlayerGroupId)
+	binary.Write(hashRes, binary.BigEndian, set.TotalSetSize)
+	translationsHash := set.Translations.Hash()
+	translationsHashBytes := make([]byte, 0, translationsHash.Size())
+	hashRes.Write(translationsHash.Sum(translationsHashBytes))
+	hashRes.Write([]byte(set.Type))
+	return hashRes
+}
+
 type MTGSetNameTranslations struct {
 	ChineseSimplified string `json:"Chinese Simplified"`
 	ChineseTraditional string `json:"Chinese Traditional"`
@@ -41,19 +79,40 @@ type MTGSetNameTranslations struct {
 	Spanish string `json:"Spanish"`
 }
 
+func (translations MTGSetNameTranslations) Hash() hash.Hash {
+	hashRes := fnv.New128a()
+
+	hashRes.Write([]byte(translations.ChineseSimplified))
+	hashRes.Write([]byte(translations.ChineseTraditional))
+	hashRes.Write([]byte(translations.French))
+	hashRes.Write([]byte(translations.German))
+	hashRes.Write([]byte(translations.Italian))
+	hashRes.Write([]byte(translations.Japanese))
+	hashRes.Write([]byte(translations.Korean))
+	hashRes.Write([]byte(translations.PortugeseBrazil))
+	hashRes.Write([]byte(translations.Russian))
+	hashRes.Write([]byte(translations.Spanish))
+
+	return hashRes
+}
+
 type MTGJSONVersion struct {
 	BuildDate string `json:"date"`
 	PricesDate string `json:"pricesDate"`
 	Version string `json:"version"`
 }
 
-func (langInfo MTGCardAlternateLanguageInfo) AddToHash(hashRes hash.Hash) {
+func (langInfo MTGCardAlternateLanguageInfo) Hash() hash.Hash {
+	hashRes := fnv.New128a()
+
 	hashRes.Write([]byte(langInfo.FlavorText))
 	hashRes.Write([]byte(langInfo.Language))
 	binary.Write(hashRes, binary.BigEndian, langInfo.MultiverseId)
 	hashRes.Write([]byte(langInfo.Name))
 	hashRes.Write([]byte(langInfo.Text))
 	hashRes.Write([]byte(langInfo.Type))
+
+	return hashRes
 }
 
 type MTGCardAlternateLanguageInfo struct {
@@ -65,10 +124,14 @@ type MTGCardAlternateLanguageInfo struct {
 	Type string `json:"type"`
 }
 
-func (purchaseURLs MTGCardPurchaseURLs) AddToHash(hashRes hash.Hash) {
+func (purchaseURLs MTGCardPurchaseURLs) Hash() hash.Hash {
+	hashRes := fnv.New128a()
+
 	hashRes.Write([]byte(purchaseURLs.Cardmarket))
 	hashRes.Write([]byte(purchaseURLs.TCGPlayer))
 	hashRes.Write([]byte(purchaseURLs.MTGStocks))
+
+	return hashRes
 }
 
 type MTGCardPurchaseURLs struct {
@@ -77,9 +140,13 @@ type MTGCardPurchaseURLs struct {
 	MTGStocks string `json:"mtgstocks"`
 }
 
-func (ruling MTGCardRuling) AddToHash(hashRes hash.Hash) {
+func (ruling MTGCardRuling) Hash() hash.Hash {
+	hashRes := fnv.New128a()
+
 	hashRes.Write([]byte(ruling.Date))
 	hashRes.Write([]byte(ruling.Text))
+
+	return hashRes
 }
 
 type MTGCardRuling struct {
@@ -147,6 +214,16 @@ func (card MTGCardCommon) AtomicPropertiesHash() hash.Hash {
 	return hashRes
 }
 
+func (card MTGCardCommon) Canonicalize() {
+	sort.Strings(card.ColorIdentity)
+	sort.Strings(card.Colors)
+	sort.Strings(card.Subtypes)
+	sort.Strings(card.Supertypes)
+	sort.Strings(card.Types)
+	sort.Strings(card.ColorIndicator)
+	sort.Strings(card.Names)
+}
+
 type MTGCardCommon struct {
 	// Atomic properties
 	// These don't change between different variations of the same card
@@ -164,7 +241,6 @@ type MTGCardCommon struct {
 	Toughness string `json:"toughness"`
 	Type string `json:"type"`
 	Types []string `json:"types"`
-	UUID string `json:"uuid"`
 
 	// Optional
 	ColorIndicator []string `json:"colorIndicator"`
@@ -181,6 +257,7 @@ type MTGCardCommon struct {
 	BorderColor string `json:"borderColor"`
 	Number string `json:"number"`
 	ScryfallId string `json:"scryfallId"`
+	UUID string `json:"uuid"`
 	Watermark string `json:"watermark"`
 
 	// Optional
@@ -198,7 +275,9 @@ func (card MTGCard) AtomicPropertiesHash() hash.Hash {
 	binary.Write(hashRes, binary.BigEndian, card.ConvertedManaCost)
 	binary.Write(hashRes, binary.BigEndian, card.FaceConvertedManaCost)
 	for _, languageData := range card.AlternateLanguageData {
-		languageData.AddToHash(hashRes)
+		languageDataHash := languageData.Hash()
+		languageDataHashBytes := make([]byte, 0, languageDataHash.Size())
+		hashRes.Write(languageDataHash.Sum(languageDataHashBytes))
 	}
 	for format, legality := range card.Legalities {
 		hashRes.Write([]byte(format))
@@ -208,9 +287,13 @@ func (card MTGCard) AtomicPropertiesHash() hash.Hash {
 	for _, printing := range card.Printings {
 		hashRes.Write([]byte(printing))
 	}
-	card.PurchaseURLs.AddToHash(hashRes)
+	purchaseURLsHash := card.PurchaseURLs.Hash()
+	purchaseURLsHashBytes := make([]byte, 0, purchaseURLsHash.Size())
+	hashRes.Write(purchaseURLsHash.Sum(purchaseURLsHashBytes))
 	for _, ruling := range card.Rulings {
-		ruling.AddToHash(hashRes)
+		rulingHash := ruling.Hash()
+		rulingHashBytes := make([]byte, 0, rulingHash.Size())
+		hashRes.Write(rulingHash.Sum(rulingHashBytes))
 	}
 	binary.Write(hashRes, binary.BigEndian, card.EDHRecRank)
 	hashRes.Write([]byte(card.Hand))
@@ -224,6 +307,74 @@ func (card MTGCard) AtomicPropertiesHash() hash.Hash {
 	hashRes.Write([]byte(card.ManaCost))
 
 	return hashRes
+}
+
+func (card MTGCard) CardHash() hash.Hash {
+	// Start with the hash of the atomic properties
+	hashRes := card.AtomicPropertiesHash()
+
+	// Next do the card common properties
+	hashRes.Write([]byte(card.Artist))
+	hashRes.Write([]byte(card.BorderColor))
+	hashRes.Write([]byte(card.Number))
+	hashRes.Write([]byte(card.ScryfallId))
+	hashRes.Write([]byte(card.UUID))
+	hashRes.Write([]byte(card.Watermark))
+	binary.Write(hashRes, binary.BigEndian, card.IsOnlineOnly)
+	hashRes.Write([]byte(card.ScryfallIllustrationId))
+
+	// Last, do the rest of the card properties
+	for _, frameEffect := range card.FrameEffects {
+		hashRes.Write([]byte(frameEffect))
+	}
+	hashRes.Write([]byte(card.FrameVersion))
+	binary.Write(hashRes, binary.BigEndian, card.MCMId)
+	binary.Write(hashRes, binary.BigEndian, card.MCMMetaId)
+	binary.Write(hashRes, binary.BigEndian, card.MultiverseId)
+	hashRes.Write([]byte(card.OriginalText))
+	hashRes.Write([]byte(card.OriginalType))
+	hashRes.Write([]byte(card.Rarity))
+	binary.Write(hashRes, binary.BigEndian, card.TCGPlayerProductId)
+	for _, variation := range card.Variations {
+		hashRes.Write([]byte(variation))
+	}
+	hashRes.Write([]byte(card.DuelDeck))
+	hashRes.Write([]byte(card.FlavorText))
+	binary.Write(hashRes, binary.BigEndian, card.HasFoil)
+	binary.Write(hashRes, binary.BigEndian, card.HasNonFoil)
+	binary.Write(hashRes, binary.BigEndian, card.IsAlternative)
+	binary.Write(hashRes, binary.BigEndian, card.IsArena)
+	binary.Write(hashRes, binary.BigEndian, card.IsFullArt)
+	binary.Write(hashRes, binary.BigEndian, card.IsMTGO)
+	binary.Write(hashRes, binary.BigEndian, card.IsOnlineOnly)
+	binary.Write(hashRes, binary.BigEndian, card.IsOversized)
+	binary.Write(hashRes, binary.BigEndian, card.IsPaper)
+	binary.Write(hashRes, binary.BigEndian, card.IsPromo)
+	binary.Write(hashRes, binary.BigEndian, card.IsReprint)
+	binary.Write(hashRes, binary.BigEndian, card.IsStarter)
+	binary.Write(hashRes, binary.BigEndian, card.IsStorySpotlight)
+	binary.Write(hashRes, binary.BigEndian, card.IsTextless)
+	binary.Write(hashRes, binary.BigEndian, card.IsTimeshifted)
+	binary.Write(hashRes, binary.BigEndian, card.MTGArenaId)
+	binary.Write(hashRes, binary.BigEndian, card.MTGOFoilId)
+	binary.Write(hashRes, binary.BigEndian, card.MTGOId)
+	for _, otherFace := range card.OtherFaceIds {
+		hashRes.Write([]byte(otherFace))
+	}
+
+	return hashRes
+}
+
+func (card MTGCard) Canonicalize() {
+	card.MTGCardCommon.Canonicalize()
+	// TODO: AlternateLanguageData
+	// TODO: Legalities
+	sort.Strings(card.Printings)
+	// TODO: Rulings
+	// TODO: Leadership skills
+	sort.Strings(card.FrameEffects)
+	sort.Strings(card.Variations)
+	sort.Strings(card.OtherFaceIds)
 }
 
 type MTGCard struct {

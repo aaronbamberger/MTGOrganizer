@@ -1,19 +1,19 @@
 version: '3'
 services:
-    card-db:
+    card_db:
         image: "mariadb:latest"
         volumes:
             - /bagner_data/Projects/MTGOrganizer/db:/var/lib/mysql
         environment:
-            MYSQL_ROOT_PASSWORD: db-password
-            MYSQL_DATABASE: mtg-cards
-            MYSQL_USER: app-user
-            MYSQL_PASSWORD: app-db-password
+            MYSQL_ROOT_PASSWORD: db_password
+            MYSQL_DATABASE: mtg_cards
+            MYSQL_USER: app_user
+            MYSQL_PASSWORD: app_db_password
     phpmyadmin:
         image: "phpmyadmin/phpmyadmin:latest"
         ports:
             - "8082:80"
         environment:
-            PMA_HOST: card-db
-            PMA_USER: app-user
-            PMA_PASSWORD: app-db-password
+            PMA_HOST: card_db
+            PMA_USER: app_user
+            PMA_PASSWORD: app_db_password
