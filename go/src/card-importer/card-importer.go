@@ -6,6 +6,7 @@ import "encoding/json"
 import "fmt"
 import "mtgcards"
 import "net/http"
+import "unicode"
 
 type CardAndCount struct {
 	Card string
@@ -125,6 +126,7 @@ func main() {
 	maxToughnessLen := 0
 	maxTypeLen := 0
 	maxWatermarkLen := 0
+	nonAsciiNameCharsMap := make(map[rune]int)
 
 	for _, set := range allSets {
 		if len(set.Block) > maxSetBlockNameLen {
@@ -238,6 +240,17 @@ func main() {
 			if len(card.Name) > maxNameLen {
 				maxNameLen = len(card.Name)
 			}
+			// Make a map of all non-ASCII characters in card names, along
+			// with their occurence count
+			for _, character := range card.Name {
+				if character > unicode.MaxASCII {
+					if _, ok := nonAsciiNameCharsMap[character]; ok {
+						nonAsciiNameCharsMap[character] = nonAsciiNameCharsMap[character] + 1
+					} else {
+						nonAsciiNameCharsMap[character] = 1
+					}
+				}
+			}
 			if len(card.Number) > maxNumberLen {
 				maxNumberLen = len(card.Number)
 			}
@@ -336,6 +349,11 @@ func main() {
 	fmt.Printf("Max toughness len: %d\n", maxToughnessLen)
 	fmt.Printf("Max type len: %d\n", maxTypeLen)
 	fmt.Printf("Max watermark len: %d\n", maxWatermarkLen)
+
+	fmt.Printf("Non ASCII characters appearing in card names:\n")
+	for character, occurences := range nonAsciiNameCharsMap {
+		fmt.Printf("\t%c: %d\n", character, occurences)
+	}
 
 	/*
 	colorIdentityMap := make(map[string]int)
