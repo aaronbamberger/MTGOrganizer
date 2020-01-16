@@ -1,7 +1,7 @@
 USE mtg_cards;
 
 CREATE TABLE mtg_cards.atomic_card_data (
-	card_data_hash CHAR(16) PRIMARY KEY,
+	card_data_hash CHAR(32) PRIMARY KEY,
 	color_identity SET('B', 'G', 'R', 'U', 'W') NULL,
 	color_indicator SET('B', 'G', 'R', 'U', 'W') NULL,
 	colors SET('B', 'G', 'R', 'U', 'W') NULL,
@@ -9,7 +9,7 @@ CREATE TABLE mtg_cards.atomic_card_data (
 	edhrec_rank INTEGER NULL,
 	face_converted_mana_cost FLOAT NOT NULL,
 	hand VARCHAR(10) NULL COLLATE utf8mb4_general_ci, #Max existing len: 2
-	is_reserved BOOLEAN NULL,
+	is_reserved BOOLEAN NOT NULL,
 	layout VARCHAR(25) NOT NULL COLLATE utf8mb4_general_ci, #Max existing len: 9
 	life VARCHAR(10) NULL COLLATE utf8mb4_general_ci, #Max existing len: 3
 	loyalty VARCHAR(20) NULL COLLATE utf8mb4_general_ci, #Max existing len: 5
@@ -26,7 +26,8 @@ CREATE TABLE mtg_cards.atomic_card_data (
 
 CREATE TABLE mtg_cards.all_cards (
 	uuid CHAR(36) PRIMARY KEY,
-	atomic_card_data_hash CHAR(16) NOT NULL,
+	full_card_hash CHAR(32) NOT NULL,
+	atomic_card_data_hash CHAR(32) NOT NULL,
 	artist VARCHAR(100) NOT NULL COLLATE utf8mb4_general_ci, #Max existing len: 54
 	border_color VARCHAR(30) NOT NULL COLLATE utf8mb4_general_ci, #Max existing len: 10
 	card_number VARCHAR(20) NOT NULL COLLATE utf8mb4_general_ci, #Max existing len: 9
@@ -83,7 +84,7 @@ CREATE TABLE mtg_cards.other_faces (
 
 CREATE TABLE mtg_cards.alternate_language_data (
 	alt_lang_id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-	card_data_hash CHAR(16) NOT NULL,
+	card_data_hash CHAR(32) NOT NULL,
 	flavor_text VARCHAR(1000) NOT NULL COLLATE utf8mb4_general_ci, #Max existing len: 574
 	language VARCHAR(50) NOT NULL COLLATE utf8mb4_general_ci, #Max existing len: 19
 	multiverse_id INTEGER NOT NULL,
@@ -93,7 +94,7 @@ CREATE TABLE mtg_cards.alternate_language_data (
 ) DEFAULT COLLATE utf8mb4_bin;
 
 CREATE TABLE mtg_cards.leadership_skills (
-	card_data_hash CHAR(16) PRIMARY KEY,
+	card_data_hash CHAR(32) PRIMARY KEY,
 	brawl_leader_legal BOOLEAN NOT NULL,
 	commander_leader_legal BOOLEAN NOT NULL,
 	oathbreaker_leader_legal BOOLEAN NOT NULL
@@ -101,7 +102,7 @@ CREATE TABLE mtg_cards.leadership_skills (
 
 CREATE TABLE mtg_cards.legalities (
 	legality_id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-	card_data_hash CHAR(16),
+	card_data_hash CHAR(32),
 	game_format_id INT NOT NULL,
 	legality_option_id INT NOT NULL
 ) DEFAULT COLLATE utf8mb4_bin;
@@ -129,7 +130,7 @@ VALUES
 
 CREATE TABLE mtg_cards.sets (
 	set_id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-	set_hash CHAR(16) NOT NULL,
+	set_hash CHAR(32) NOT NULL,
 	base_size INT NOT NULL,
 	block_name VARCHAR(50) NULL COLLATE utf8mb4_general_ci, #Max existing len: 22
 	code VARCHAR(20) NOT NULL COLLATE utf8mb4_general_ci, #Max existing len: 6
@@ -151,7 +152,7 @@ CREATE TABLE mtg_cards.sets (
 
 CREATE TABLE mtg_cards.card_printings (
 	card_printing_id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-	card_data_hash CHAR(16) NOT NULL,
+	card_data_hash CHAR(32) NOT NULL,
 	set_id INT NOT NULL
 ) DEFAULT COLLATE utf8mb4_bin;
 
@@ -173,20 +174,20 @@ CREATE TABLE mtg_cards.purchase_urls (
 
 CREATE TABLE mtg_cards.rulings (
 	ruling_id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-	card_data_hash CHAR(16) NOT NULL,
+	card_data_hash CHAR(32) NOT NULL,
 	ruling_date DATE NOT NULL,
 	ruling_text VARCHAR(3000) NOT NULL COLLATE utf8mb4_general_ci #Max existing len: 1513
 ) DEFAULT COLLATE utf8mb4_bin;
 
 CREATE TABLE mtg_cards.card_subtypes (
 	subtype_id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-	card_data_hash CHAR(16) NOT NULL,
+	card_data_hash CHAR(32) NOT NULL,
 	card_subtype VARCHAR(50) NOT NULL COLLATE utf8mb4_general_ci #Max existing len: 26
 ) DEFAULT COLLATE utf8mb4_bin;
 
 CREATE TABLE mtg_cards.card_supertypes (
 	supertype_id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-	card_data_hash CHAR(16) NOT NULL,
+	card_data_hash CHAR(32) NOT NULL,
 	card_supertype VARCHAR(50) NOT NULL COLLATE utf8mb4_general_ci #Max existing len: 9
 ) DEFAULT COLLATE utf8mb4_bin;
 

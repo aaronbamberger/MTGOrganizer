@@ -27,7 +27,7 @@ type MTGSet struct {
 	Type string `json:"type"`
 }
 
-func (set MTGSet) SetHash() hash.Hash {
+func (set MTGSet) Hash() hash.Hash {
 	hashRes := fnv.New128a()
 	binary.Write(hashRes, binary.BigEndian, set.BaseSetSize)
 	hashRes.Write([]byte(set.Block))
