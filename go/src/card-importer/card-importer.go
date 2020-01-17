@@ -260,6 +260,7 @@ func main() {
 					// Hashes don't match, so we need to look at each card in the set to update
 					fmt.Printf("Set %s hashes don't match (db: %s, json: %s), updating set...\n",
 						setCode, dbSetHash, setHash)
+					//TODO: Maybe update cards in set
 				}
 			}
 		} else {
@@ -280,18 +281,26 @@ func main() {
 				card.Canonicalize()
 				// First, calculate the atomic properties hash, so we can see if this card
 				// shares its atomic properties with an existing card in the db
-				atomicPropertiesHash := HashToHexString(card.AtomicPropertiesHash())
-				atomicPropertiesExist, err := mtgcards.CheckAtomicPropertiesDataExistence(atomicPropertiesHash)
+				var atomicPropId int64
+				var exists bool
+				atomicPropHash := HashToHexString(card.AtomicPropertiesHash())
+				atomicPropId, exists, err = mtgcards.GetAtomicPropertiesId(atomicPropHash, &card)
 				if err != nil {
 					fmt.Println(err)
 					continue
 				}
 
-				// If this is a newly seen set of atomic properties, we need to insert
-				// a new record
-				if !atomicPropertiesExist {
-					card.InsertAtomicPropertiesToDb(atomicPropertiesHash)
+				if !exists {
+					// If the atomic properties don't exist already, we need to insert
+					// a new record
+					atomicPropId, err = card.InsertAtomicPropertiesToDb(atomicPropHash)
+					if err != nil {
+						fmt.Println(err)
+						continue
+					}
 				}
+
+				fmt.Printf("Atomic Prop Id: %d\n", atomicPropId)
 
 				// Now, insert the rest of the card data
 			}

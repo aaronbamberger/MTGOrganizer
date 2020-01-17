@@ -1,7 +1,8 @@
 USE mtg_cards;
 
 CREATE TABLE mtg_cards.atomic_card_data (
-	card_data_hash CHAR(32) PRIMARY KEY,
+	atomic_card_data_id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+	card_data_hash CHAR(32) NOT NULL,
 	color_identity SET('B', 'G', 'R', 'U', 'W') NULL,
 	color_indicator SET('B', 'G', 'R', 'U', 'W') NULL,
 	colors SET('B', 'G', 'R', 'U', 'W') NULL,
@@ -25,7 +26,7 @@ CREATE TABLE mtg_cards.atomic_card_data (
 ) DEFAULT COLLATE utf8mb4_bin;
 
 CREATE TABLE mtg_cards.all_cards (
-	uuid CHAR(36) PRIMARY KEY,
+	uuid CHAR(36) NOT NULL PRIMARY KEY,
 	full_card_hash CHAR(32) NOT NULL,
 	atomic_card_data_hash CHAR(32) NOT NULL,
 	artist VARCHAR(100) NOT NULL COLLATE utf8mb4_general_ci, #Max existing len: 54
