@@ -4,17 +4,9 @@ import "compress/gzip"
 import "database/sql"
 import _ "github.com/go-sql-driver/mysql"
 import "encoding/json"
-import "encoding/hex"
 import "fmt"
-import "hash"
 import "mtgcards"
 import "net/http"
-
-func HashToHexString(hashVal hash.Hash) string {
-	hashBytes := make([]byte, 0, hashVal.Size())
-	hashBytes = hashVal.Sum(hashBytes)
-	return hex.EncodeToString(hashBytes)
-}
 
 func main() {
 	resp, err := http.Get("https://www.mtgjson.com/files/AllPrintings.json.gz")
@@ -57,6 +49,7 @@ func main() {
 		fmt.Println(err)
 		return
 	}
+	fmt.Printf("Prepare insert set query\n")
 	insertSetQuery, err := db.Prepare(`INSERT INTO sets
 		(set_hash, base_size, block_name, code, is_foreign_only, is_foil_only,
 		is_online_only, is_partial_preview, keyrune_code, mcm_name, mcm_id,
@@ -69,140 +62,15 @@ func main() {
 		fmt.Println(err)
 		return
 	}
-	/*
-	insertCardQuery, err := db.Prepare(`INSERT INTO all_cards
-		(uuid, full_card_hash, atomic_card_data_hash, artist, border_color,
-		card_number, scryfall_id, watermark, frame_version, mcm_id, mcm_meta_id,
-		multiverse_id, original_text, original_type, rarity, tcgplayer_product_id,
-		duel_deck, flavor_text, has_foil, has_non_foil, is_alternative, is_arena,
-		is_full_art, is_mtgo, is_online_only, is_oversized, is_paper, is_promo,
-		is_reprint, is_starter, is_story_spotlight, is_textless, is_timeshifted,
-		mtg_arena_id, mtgo_foil_id, mtgo_id, scryfall_illustration_id)
-		VALUES
-		(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-		?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-	defer insertCardQuery.Close()
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	insertAltLangDataQuery, err := db.Prepare(`INSERT INTO alternate_language_data
-		(card_data_hash, flavor_text, language, multiverse_id, name, text, card_type)
-		VALUES
-		(?, ?, ?, ?, ?, ?, ?)`)
-	defer insertAltLangDataQuery.Close()
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	insertCardPrintingQuery, err := db.Prepare(`INSERT INTO card_printings
-		(card_data_hash, set_id)
-		VALUES
-		(?, ?)`)
-	defer insertCardPrintingQuery.Close()
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	insertCardSubtypeQuery, err := db.Prepare(`INSERT INTO card_subtypes
-		(card_data_hash, card_subtype)
-		VALUES
-		(?, ?)`)
-	defer insertCardSubtypeQuery.Close()
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	insertCardSupertypeQuery, err := db.Prepare(`INSERT INTO card_supertypes
-		(card_data_hash, card_supertype)
-		VALUES
-		(?, ?)`)
-	defer insertCardSupertypeQuery.Close()
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	insertFrameEffectQuery, err := db.Prepare(`INSERT INTO frame_effects
-		(card_uuid, frame_effect)
-		VALUES
-		(?, ?)`)
-	defer insertFrameEffectQuery.Close()
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	insertLeadershipSkillQuery, err := db.Prepare(`INSERT INTO leadership_skills
-		(card_data_hash, brawl_leader_legal, commander_leader_legal, oathbreaker_leader_legal)
-		VALUES
-		(?, ?, ?, ?)`)
-	defer insertLeadershipSkillQuery.Close()
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	insertLegalityQuery, err := db.Prepare(`INSERT INTO legalities
-		(card_data_hash, game_format_id, legality_option_id)
-		VALUES
-		(?, ?, ?, ?)`)
-	defer insertLegalityQuery.Close()
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	insertOtherFaceIdQuery, err := db.Prepare(`INSERT INTO other_faces
-		(card_uuid, other_face_id)
-		VALUES
-		(?, ?)`)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	insertPurchaseUrlQuery, err := db.Prepare(`INSERT INTO purchase_urls
-		(purchase_site_id, purchase_url)
-		VALUES
-		(?, ?)`)
-	defer insertPurchaseUrlQuery.Close()
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	insertRulingQuery, err := db.Prepare(`INSERT INTO rulings
-		(card_data_hash, ruling_date, ruling_text)
-		VALUES
-		(?, ?, ?)`)
-	defer insertRulingQuery.Close()
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	insertSetTranslationQuery, err := db.Prepare(`INSERT INTO set_translations
-		(set_id, set_translation_language_id, set_translated_name)
-		VALUES
-		(?, ?, ?)`)
-	defer insertSetTranslationQuery.Close()
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	insertVariationQuery, err := db.Prepare(`INSERT INTO variations
-		(card_uuid, variation_uuid)
-		VALUES
-		(?, ?)`)
-	defer insertVariationQuery.Close()
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	*/
 
 	err = mtgcards.CreateDbQueries(db)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
+	defer mtgcards.CloseDbQueries()
 
 	// Fetch some things from the db for future use
-	/*
 	gameFormats, err := mtgcards.GetGameFormats(db)
 	if err != nil {
 		fmt.Println(err)
@@ -218,19 +86,28 @@ func main() {
 		fmt.Println(err)
 		return
 	}
+	/*
 	setTranslationLanguages, err := mtgcards.GetSetTranslationLanguages(db)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 	*/
+	leadershipFormats, err := mtgcards.GetLeadershipFormats(db)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 
+	totalSets := len(allSets)
+	currentSet := 1
 	for setCode, set := range allSets {
-		fmt.Printf("Processing set with code %s\n", setCode)
+		fmt.Printf("Processing set with code %s (%d of %d)\n", setCode, currentSet, totalSets)
+		currentSet += 1
 
 		// Hash the set for later use
 		set.Canonicalize()
-		setHash := HashToHexString(set.Hash())
+		setHash := mtgcards.HashToHexString(set.Hash())
 
 		// First, check to see if this set is in the DB at all
 		setRows, err := setHashQuery.Query(setCode)
@@ -266,7 +143,7 @@ func main() {
 		} else {
 			// This set does not already exist in the db
 			fmt.Printf("Set %s does not exist in the db, inserting the set\n", setCode)
-			_, err := insertSetQuery.Exec(setHash, set.BaseSetSize, set.Block, set.Code, set.IsForeignOnly,
+			res, err := insertSetQuery.Exec(setHash, set.BaseSetSize, set.Block, set.Code, set.IsForeignOnly,
 				set.IsFoilOnly, set.IsOnlineOnly, set.IsPartialPreview, set.KeyruneCode, set.MCMName,
 				set.MCMId, set.MTGOCode, set.Name, set.ParentCode, set.ReleaseDate, set.TCGPlayerGroupId,
 				set.TotalSetSize, set.Type)
@@ -274,6 +151,17 @@ func main() {
 				fmt.Println(err)
 				continue
 			}
+
+			setId, err := res.LastInsertId()
+			if err != nil {
+				fmt.Println(err)
+				continue
+			}
+
+			// Insert the set translations
+			fmt.Printf("Set id: %d\n", setId)
+			//TODO: Figure out a better way to do this
+
 			// Insert all of the cards in the set.  No need to check the full card hash, since we're bulk
 			// inserting the entire set
 			fmt.Printf("Processing cards in set %s\n", setCode)
@@ -283,7 +171,7 @@ func main() {
 				// shares its atomic properties with an existing card in the db
 				var atomicPropId int64
 				var exists bool
-				atomicPropHash := HashToHexString(card.AtomicPropertiesHash())
+				atomicPropHash := mtgcards.HashToHexString(card.AtomicPropertiesHash())
 				atomicPropId, exists, err = mtgcards.GetAtomicPropertiesId(atomicPropHash, &card)
 				if err != nil {
 					fmt.Println(err)
@@ -300,9 +188,103 @@ func main() {
 					}
 				}
 
-				fmt.Printf("Atomic Prop Id: %d\n", atomicPropId)
-
 				// Now, insert the rest of the card data
+				err = card.InsertCardToDb(atomicPropId)
+				if err != nil {
+					fmt.Println(err)
+					continue
+				}
+
+				// Alternate language data
+				for _, altLangData := range card.AlternateLanguageData {
+					err = altLangData.InsertAltLangDataToDb(atomicPropId)
+					if err != nil {
+						fmt.Println(err)
+					}
+				}
+
+				// Leadership skills
+				for leadershipFormat, leaderValid := range card.LeadershipSkills {
+					err = mtgcards.InsertLeadershipSkillToDb(atomicPropId,
+						leadershipFormats[leadershipFormat], leaderValid)
+					if err != nil {
+						fmt.Println(err)
+					}
+				}
+
+				// Legalities
+				for format, legality := range card.Legalities {
+					err = mtgcards.InsertLegalityToDb(atomicPropId,
+						gameFormats[format], legalityOptions[legality])
+					if err != nil {
+						fmt.Println(err)
+					}
+				}
+
+				// Other face IDs
+				for _, otherFaceId := range card.OtherFaceIds {
+					err = card.InsertOtherFaceIdToDb(otherFaceId)
+					if err != nil {
+						fmt.Println(err)
+					}
+				}
+
+				// Printings
+				for _, setCode := range card.Printings {
+					err = mtgcards.InsertCardPrintingToDb(atomicPropId, setCode)
+					if err != nil {
+						fmt.Println(err)
+					}
+				}
+
+				// Purchase URLs
+				err = mtgcards.InsertPurchaseURLToDb(atomicPropId,
+					purchaseSites["cardmarket"], card.PurchaseURLs.Cardmarket)
+				if err != nil {
+					fmt.Println(err)
+				}
+				err = mtgcards.InsertPurchaseURLToDb(atomicPropId,
+					purchaseSites["tcgplayer"], card.PurchaseURLs.TCGPlayer)
+				if err != nil {
+					fmt.Println(err)
+				}
+				err = mtgcards.InsertPurchaseURLToDb(atomicPropId,
+					purchaseSites["mtgstocks"], card.PurchaseURLs.MTGStocks)
+				if err != nil {
+					fmt.Println(err)
+				}
+
+				// Rulings
+				for _, ruling := range card.Rulings {
+					err = ruling.InsertRulingToDb(atomicPropId)
+					if err != nil {
+						fmt.Println(err)
+					}
+				}
+
+				// Subtypes
+				for _, subtype := range card.Subtypes {
+					err = mtgcards.InsertCardSubtypeToDb(atomicPropId, subtype)
+					if err != nil {
+						fmt.Println(err)
+					}
+				}
+
+				// Supertypes
+				for _, supertype := range card.Supertypes {
+					err = mtgcards.InsertCardSupertypeToDb(atomicPropId, supertype)
+					if err != nil {
+						fmt.Println(err)
+					}
+				}
+
+				// Variations
+				for _, variation := range card.Variations {
+					err = card.InsertVariationToDb(variation)
+					if err != nil {
+						fmt.Println(err)
+					}
+				}
 			}
 		}
 	}

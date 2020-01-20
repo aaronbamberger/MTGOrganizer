@@ -32,7 +32,7 @@ func (set MTGSet) Hash() hash.Hash {
 	binary.Write(hashRes, binary.BigEndian, set.BaseSetSize)
 	hashRes.Write([]byte(set.Block))
 	for _, card := range set.Cards {
-		cardHash := card.CardHash()
+		cardHash := card.Hash()
 		cardHashBytes := make([]byte, 0, cardHash.Size())
 		hashRes.Write(cardHash.Sum(cardHashBytes))
 	}

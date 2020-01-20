@@ -218,7 +218,7 @@ func (card MTGCard) AtomicPropertiesHash() hash.Hash {
 	return hashRes
 }
 
-func (card MTGCard) CardHash() hash.Hash {
+func (card MTGCard) Hash() hash.Hash {
 	// Start with the hash of the atomic properties
 	hashRes := card.AtomicPropertiesHash()
 

@@ -1,15 +1,51 @@
 package mtgcards
 
 import "database/sql"
+import "encoding/hex"
 import "fmt"
+import "hash"
 import "strings"
 
 var atomicPropertiesIdQuery *sql.Stmt
 var insertAtomicPropertiesQuery *sql.Stmt
 var numAtomicPropertiesQuery *sql.Stmt
+var insertCardQuery *sql.Stmt
+var insertAltLangDataQuery *sql.Stmt
+var insertCardPrintingQuery *sql.Stmt
+var insertCardSubtypeQuery *sql.Stmt
+var insertCardSupertypeQuery *sql.Stmt
+var insertFrameEffectQuery *sql.Stmt
+var insertLeadershipSkillQuery *sql.Stmt
+var insertLegalityQuery *sql.Stmt
+var insertOtherFaceIdQuery *sql.Stmt
+var insertPurchaseUrlQuery *sql.Stmt
+var insertRulingQuery *sql.Stmt
+var insertSetTranslationQuery *sql.Stmt
+var insertVariationQuery *sql.Stmt
+
+func checkRowsAffected(res sql.Result, expectedAffected int64, errString string) error {
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected != expectedAffected {
+		return fmt.Errorf("Query %s affected an unexpected number of rows, expected %d, got %d\n",
+			errString, expectedAffected, rowsAffected)
+	}
+
+	return nil
+}
+
+func HashToHexString(hashVal hash.Hash) string {
+	hashBytes := make([]byte, 0, hashVal.Size())
+	hashBytes = hashVal.Sum(hashBytes)
+	return hex.EncodeToString(hashBytes)
+}
 
 func CreateDbQueries(db *sql.DB) error {
 	var err error
+	fmt.Printf("Prepare query 1\n")
 	numAtomicPropertiesQuery, err = db.Prepare(`SELECT COUNT(scryfall_oracle_id)
 		FROM atomic_card_data
 		WHERE card_data_hash = ?`)
@@ -17,6 +53,7 @@ func CreateDbQueries(db *sql.DB) error {
 		return err
 	}
 
+	fmt.Printf("Prepare query 2\n")
 	atomicPropertiesIdQuery, err = db.Prepare(`SELECT atomic_card_data_id, scryfall_oracle_id
 		FROM atomic_card_data
 		WHERE card_data_hash = ?`)
@@ -24,6 +61,7 @@ func CreateDbQueries(db *sql.DB) error {
 		return err
 	}
 
+	fmt.Printf("Prepare query 3\n")
 	insertAtomicPropertiesQuery, err = db.Prepare(`INSERT INTO atomic_card_data
 		(card_data_hash, color_identity, color_indicator, colors, converted_mana_cost,
 		edhrec_rank, face_converted_mana_cost, hand, is_reserved, layout, life,
@@ -35,6 +73,130 @@ func CreateDbQueries(db *sql.DB) error {
 		return err
 	}
 
+	fmt.Printf("Prepare query 4\n")
+	insertCardQuery, err = db.Prepare(`INSERT INTO all_cards
+		(uuid, full_card_hash, atomic_card_data_id, artist, border_color,
+		card_number, scryfall_id, watermark, frame_version, mcm_id, mcm_meta_id,
+		multiverse_id, original_text, original_type, rarity, tcgplayer_product_id,
+		duel_deck, flavor_text, has_foil, has_non_foil, is_alternative, is_arena,
+		is_full_art, is_mtgo, is_online_only, is_oversized, is_paper, is_promo,
+		is_reprint, is_starter, is_story_spotlight, is_textless, is_timeshifted,
+		mtg_arena_id, mtgo_foil_id, mtgo_id, scryfall_illustration_id)
+		VALUES
+		(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+		?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Prepare query 5\n")
+	insertAltLangDataQuery, err = db.Prepare(`INSERT INTO alternate_language_data
+		(atomic_card_data_id, flavor_text, language, multiverse_id, name, text, card_type)
+		VALUES
+		(?, ?, ?, ?, ?, ?, ?)`)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Prepare query 6\n")
+	insertCardPrintingQuery, err = db.Prepare(`INSERT INTO card_printings
+		(atomic_card_data_id, set_code)
+		VALUES
+		(?, ?)`)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Prepare query 7\n")
+	insertCardSubtypeQuery, err = db.Prepare(`INSERT INTO card_subtypes
+		(atomic_card_data_id, card_subtype)
+		VALUES
+		(?, ?)`)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Prepare query 8\n")
+	insertCardSupertypeQuery, err = db.Prepare(`INSERT INTO card_supertypes
+		(atomic_card_data_id, card_supertype)
+		VALUES
+		(?, ?)`)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Prepare query 9\n")
+	insertFrameEffectQuery, err = db.Prepare(`INSERT INTO frame_effects
+		(card_uuid, frame_effect)
+		VALUES
+		(?, ?)`)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Prepare query 10\n")
+	insertLeadershipSkillQuery, err = db.Prepare(`INSERT INTO leadership_skills
+		(atomic_card_data_id, leadership_format_id, leader_legal)
+		VALUES
+		(?, ?, ?)`)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Prepare query 11\n")
+	insertLegalityQuery, err = db.Prepare(`INSERT INTO legalities
+		(atomic_card_data_id, game_format_id, legality_option_id)
+		VALUES
+		(?, ?, ?)`)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Prepare query 12\n")
+	insertOtherFaceIdQuery, err = db.Prepare(`INSERT INTO other_faces
+		(card_uuid, other_face_uuid)
+		VALUES
+		(?, ?)`)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Prepare query 13\n")
+	insertPurchaseUrlQuery, err = db.Prepare(`INSERT INTO purchase_urls
+		(atomic_card_data_id, purchase_site_id, purchase_url)
+		VALUES
+		(?, ?, ?)`)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Prepare query 14\n")
+	insertRulingQuery, err = db.Prepare(`INSERT INTO rulings
+		(atomic_card_data_id, ruling_date, ruling_text)
+		VALUES
+		(?, ?, ?)`)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Prepare query 15\n")
+	insertSetTranslationQuery, err = db.Prepare(`INSERT INTO set_translations
+		(set_id, set_translation_language_id, set_translated_name)
+		VALUES
+		(?, ?, ?)`)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Prepare query 16\n")
+	insertVariationQuery, err = db.Prepare(`INSERT INTO variations
+		(card_uuid, variation_uuid)
+		VALUES
+		(?, ?)`)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -42,12 +204,234 @@ func CloseDbQueries() {
 	if numAtomicPropertiesQuery != nil {
 		numAtomicPropertiesQuery.Close()
 	}
+
 	if atomicPropertiesIdQuery != nil {
 		atomicPropertiesIdQuery.Close()
 	}
+
 	if insertAtomicPropertiesQuery != nil {
 		insertAtomicPropertiesQuery.Close()
 	}
+
+	if insertCardQuery != nil {
+		insertCardQuery.Close()
+	}
+
+	if insertAltLangDataQuery != nil {
+		insertAltLangDataQuery.Close()
+	}
+
+	if insertCardPrintingQuery != nil {
+		insertCardPrintingQuery.Close()
+	}
+
+	if insertCardSubtypeQuery != nil {
+		insertCardSubtypeQuery.Close()
+	}
+
+	if insertCardSupertypeQuery != nil {
+		insertCardSupertypeQuery.Close()
+	}
+
+	if insertFrameEffectQuery != nil {
+		insertFrameEffectQuery.Close()
+	}
+
+	if insertLeadershipSkillQuery != nil {
+		insertLeadershipSkillQuery.Close()
+	}
+
+	if insertLegalityQuery != nil {
+		insertLegalityQuery.Close()
+	}
+
+	if insertOtherFaceIdQuery != nil {
+		insertOtherFaceIdQuery.Close()
+	}
+
+	if insertPurchaseUrlQuery != nil {
+		insertPurchaseUrlQuery.Close()
+	}
+
+	if insertRulingQuery != nil {
+		insertRulingQuery.Close()
+	}
+
+	if insertSetTranslationQuery != nil {
+		insertSetTranslationQuery.Close()
+	}
+
+	if insertVariationQuery != nil {
+		insertVariationQuery.Close()
+	}
+}
+
+func (card MTGCard) InsertFrameEffectToDb(frameEffect string) error {
+	res, err := insertFrameEffectQuery.Exec(card.UUID, frameEffect)
+	if err != nil {
+		return err
+	}
+
+	return checkRowsAffected(res, 1, "insert frame effect")
+}
+
+func InsertLeadershipSkillToDb(atomicPropertiesId int64, leadershipFormatId int, leaderLegal bool) error {
+	res, err := insertLeadershipSkillQuery.Exec(atomicPropertiesId, leadershipFormatId, leaderLegal)
+	if err != nil {
+		return err
+	}
+
+	return checkRowsAffected(res, 1, "insert leadership skill")
+}
+
+func InsertLegalityToDb(atomicPropertiesId int64, gameFormatId int, legalityOptionId int) error {
+	res, err := insertLegalityQuery.Exec(atomicPropertiesId, gameFormatId, legalityOptionId)
+	if err != nil {
+		return err
+	}
+
+	return checkRowsAffected(res, 1, "insert legality")
+}
+
+func InsertCardPrintingToDb(atomicPropertiesId int64, setCode string) error {
+	res, err := insertCardPrintingQuery.Exec(atomicPropertiesId, setCode)
+	if err != nil {
+		return err
+	}
+
+	return checkRowsAffected(res, 1, "insert card printing")
+}
+
+func InsertPurchaseURLToDb(atomicPropertiesId int64, purchaseSiteId int, purchaseURL string) error {
+	res, err := insertPurchaseUrlQuery.Exec(atomicPropertiesId, purchaseSiteId, purchaseURL)
+	if err != nil {
+		return err
+	}
+
+	return checkRowsAffected(res, 1, "insert purchase url")
+}
+
+func (altLangInfo MTGCardAlternateLanguageInfo) InsertAltLangDataToDb(atomicPropertiesId int64) error {
+	res, err := insertAltLangDataQuery.Exec(atomicPropertiesId, altLangInfo.FlavorText,
+		altLangInfo.Language, altLangInfo.MultiverseId, altLangInfo.Name,
+		altLangInfo.Text, altLangInfo.Type)
+	if err != nil {
+		return err
+	}
+
+	return checkRowsAffected(res, 1, "insert alt lang info")
+}
+
+func (ruling MTGCardRuling) InsertRulingToDb(atomicPropertiesId int64) error {
+	res, err := insertRulingQuery.Exec(atomicPropertiesId, ruling.Date, ruling.Text)
+	if err != nil {
+		return err
+	}
+
+	return checkRowsAffected(res, 1, "insert ruling")
+}
+
+func InsertCardSubtypeToDb(atomicPropertiesId int64, subtype string) error {
+	res, err := insertCardSubtypeQuery.Exec(atomicPropertiesId, subtype)
+	if err != nil {
+		return err
+	}
+
+	return checkRowsAffected(res, 1, "insert subtype")
+}
+
+func InsertCardSupertypeToDb(atomicPropertiesId int64, supertype string) error {
+	res, err := insertCardSupertypeQuery.Exec(atomicPropertiesId, supertype)
+	if err != nil {
+		return err
+	}
+
+	return checkRowsAffected(res, 1, "insert supertype")
+}
+
+func InsertSetTranslationToDb(setId int, translationLangId int, translatedName string) error {
+	res, err := insertSetTranslationQuery.Exec(setId, translationLangId, translatedName)
+	if err != nil {
+		return err
+	}
+
+	return checkRowsAffected(res, 1, "insert set name translation")
+}
+
+func (card MTGCard) InsertOtherFaceIdToDb(otherFaceUUID string) error {
+	res, err := insertOtherFaceIdQuery.Exec(card.UUID, otherFaceUUID)
+	if err != nil {
+		return err
+	}
+
+	return checkRowsAffected(res, 1, "insert other face ID")
+}
+
+func (card MTGCard) InsertVariationToDb(variationUUID string) error {
+	res, err := insertVariationQuery.Exec(card.UUID, variationUUID)
+	if err != nil {
+		return err
+	}
+
+	return checkRowsAffected(res, 1, "insert variation")
+}
+
+func (card MTGCard) InsertCardToDb(atomicPropertiesId int64) error {
+	var duelDeck sql.NullString
+	var flavorText sql.NullString
+	var mtgArenaId sql.NullInt32
+	var mtgoFoilId sql.NullInt32
+	var mtgoId sql.NullInt32
+	var scryfallIllustrationId sql.NullString
+
+	if len(card.DuelDeck) > 0 {
+		duelDeck.String = card.DuelDeck
+		duelDeck.Valid = true
+	}
+
+	if len(card.FlavorText) > 0 {
+		flavorText.String = card.FlavorText
+		flavorText.Valid = true
+	}
+
+	if card.MTGArenaId > 0 {
+		mtgArenaId.Int32 = int32(card.MTGArenaId)
+		mtgArenaId.Valid = true
+	}
+
+	if card.MTGOFoilId > 0 {
+		mtgoFoilId.Int32 = int32(card.MTGOFoilId)
+		mtgoFoilId.Valid = true
+	}
+
+	if card.MTGOId > 0 {
+		mtgoId.Int32 = int32(card.MTGOId)
+		mtgoId.Valid = true
+	}
+
+	if len(card.ScryfallIllustrationId) > 0 {
+		scryfallIllustrationId.String = card.ScryfallIllustrationId
+		scryfallIllustrationId.Valid = true
+	}
+
+	cardHash := HashToHexString(card.Hash())
+
+	res, err := insertCardQuery.Exec(card.UUID, cardHash, atomicPropertiesId,
+		card.Artist, card.BorderColor, card.Number, card.ScryfallId,
+		card.Watermark, card.FrameVersion, card.MCMId, card.MCMMetaId,
+		card.MultiverseId, card.OriginalText, card.OriginalType,
+		card.Rarity, card.TCGPlayerProductId, duelDeck, flavorText,
+		card.HasFoil, card.HasNonFoil, card.IsAlternative, card.IsArena,
+		card.IsFullArt, card.IsMTGO, card.IsOnlineOnly, card.IsOversized,
+		card.IsPaper, card.IsPromo, card.IsReprint, card.IsStarter,
+		card.IsStorySpotlight, card.IsTextless, card.IsTimeshifted,
+		mtgArenaId, mtgoFoilId, mtgoId, scryfallIllustrationId)
+
+	if err != nil {
+		return err
+	}
+
+	return checkRowsAffected(res, 1, "insert card data")
 }
 
 func (card MTGCard) InsertAtomicPropertiesToDb(atomicPropertiesHash string) (int64, error) {
@@ -133,13 +517,9 @@ func (card MTGCard) InsertAtomicPropertiesToDb(atomicPropertiesHash string) (int
 		return 0, err
 	}
 
-	rowsAffected, err := res.RowsAffected()
+	err = checkRowsAffected(res, 1, "insert atomic card data")
 	if err != nil {
 		return 0, err
-	}
-
-	if rowsAffected != 1 {
-		return 0, fmt.Errorf("Insert of atomic card data affected an unexpected num rows: %d", rowsAffected)
 	}
 
 	lastInsertId, err := res.LastInsertId()
@@ -280,6 +660,36 @@ func GetSetTranslationLanguages(db *sql.DB) (map[string]int, error) {
 	}
 
 	return setTranslationLanguages, nil
+}
+
+func GetLeadershipFormats(db *sql.DB) (map[string]int, error) {
+	retrieveLeadershipFormatsQuery, err := db.Prepare(`SELECT leadership_format_id,
+		leadership_format_name FROM leadership_formats`)
+	defer retrieveLeadershipFormatsQuery.Close()
+
+	leadershipFormats := make(map[string]int)
+
+	leadershipFormatsRows, err := retrieveLeadershipFormatsQuery.Query()
+	if err != nil {
+		return nil, err
+	}
+	defer leadershipFormatsRows.Close()
+
+	for leadershipFormatsRows.Next() {
+		if err := leadershipFormatsRows.Err(); err != nil {
+			return nil, err
+		}
+
+		var leadershipFormatId int
+		var leadershipFormatName string
+		err := leadershipFormatsRows.Scan(&leadershipFormatId, &leadershipFormatName)
+		if err != nil {
+			return nil, err
+		}
+		leadershipFormats[leadershipFormatName] = leadershipFormatId
+	}
+
+	return leadershipFormats, nil
 }
 
 func GetAtomicPropertiesId(atomicPropertiesHash string, card *MTGCard) (int64, bool, error) {
