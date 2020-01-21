@@ -1,5 +1,8 @@
 db/
 *.swp
 go/src/card-importer/card-importer
+go/src/card-importer/AllPrintings.json
+go/src/card-importer/AllPrintings.json.gz
+go/src/card-importer/AllPrintings.json.bz2
 go/pkg/
 go/src/github.com/

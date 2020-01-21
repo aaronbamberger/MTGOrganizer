@@ -25,39 +25,45 @@ type MTGSet struct {
 	TotalSetSize int `json:"totalSetSize"`
 	Translations MTGSetNameTranslations `json:"translations"`
 	Type string `json:"type"`
+	hash hash.Hash
+	hashValid bool
 }
 
-func (set MTGSet) Hash() hash.Hash {
-	hashRes := fnv.New128a()
-	binary.Write(hashRes, binary.BigEndian, set.BaseSetSize)
-	hashRes.Write([]byte(set.Block))
-	for _, card := range set.Cards {
-		cardHash := card.Hash()
-		cardHashBytes := make([]byte, 0, cardHash.Size())
-		hashRes.Write(cardHash.Sum(cardHashBytes))
+func (set *MTGSet) Hash() hash.Hash {
+	if !set.hashValid {
+		set.hash = fnv.New128a()
+		binary.Write(set.hash, binary.BigEndian, set.BaseSetSize)
+		set.hash.Write([]byte(set.Block))
+		for _, card := range set.Cards {
+			cardHash := card.Hash()
+			cardHashBytes := make([]byte, 0, cardHash.Size())
+			set.hash.Write(cardHash.Sum(cardHashBytes))
+		}
+		set.hash.Write([]byte(set.Code))
+		binary.Write(set.hash, binary.BigEndian, set.IsForeignOnly)
+		binary.Write(set.hash, binary.BigEndian, set.IsFoilOnly)
+		binary.Write(set.hash, binary.BigEndian, set.IsOnlineOnly)
+		binary.Write(set.hash, binary.BigEndian, set.IsPartialPreview)
+		set.hash.Write([]byte(set.KeyruneCode))
+		set.hash.Write([]byte(set.MCMName))
+		binary.Write(set.hash, binary.BigEndian, set.MCMId)
+		set.hash.Write([]byte(set.MTGOCode))
+		set.hash.Write([]byte(set.Name))
+		set.hash.Write([]byte(set.ParentCode))
+		set.hash.Write([]byte(set.ReleaseDate))
+		binary.Write(set.hash, binary.BigEndian, set.TCGPlayerGroupId)
+		binary.Write(set.hash, binary.BigEndian, set.TotalSetSize)
+		translationsHash := set.Translations.Hash()
+		translationsHashBytes := make([]byte, 0, translationsHash.Size())
+		set.hash.Write(translationsHash.Sum(translationsHashBytes))
+		set.hash.Write([]byte(set.Type))
+		set.hashValid = true
 	}
-	hashRes.Write([]byte(set.Code))
-	binary.Write(hashRes, binary.BigEndian, set.IsForeignOnly)
-	binary.Write(hashRes, binary.BigEndian, set.IsFoilOnly)
-	binary.Write(hashRes, binary.BigEndian, set.IsOnlineOnly)
-	binary.Write(hashRes, binary.BigEndian, set.IsPartialPreview)
-	hashRes.Write([]byte(set.KeyruneCode))
-	hashRes.Write([]byte(set.MCMName))
-	binary.Write(hashRes, binary.BigEndian, set.MCMId)
-	hashRes.Write([]byte(set.MTGOCode))
-	hashRes.Write([]byte(set.Name))
-	hashRes.Write([]byte(set.ParentCode))
-	hashRes.Write([]byte(set.ReleaseDate))
-	binary.Write(hashRes, binary.BigEndian, set.TCGPlayerGroupId)
-	binary.Write(hashRes, binary.BigEndian, set.TotalSetSize)
-	translationsHash := set.Translations.Hash()
-	translationsHashBytes := make([]byte, 0, translationsHash.Size())
-	hashRes.Write(translationsHash.Sum(translationsHashBytes))
-	hashRes.Write([]byte(set.Type))
-	return hashRes
+
+	return set.hash
 }
 
-func (set MTGSet) Canonicalize() {
+func (set *MTGSet) Canonicalize() {
 	sort.Sort(ByUUID(set.Cards))
 	for _, card := range set.Cards {
 		card.Canonicalize()

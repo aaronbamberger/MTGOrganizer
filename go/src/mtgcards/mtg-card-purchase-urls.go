@@ -7,14 +7,21 @@ type MTGCardPurchaseURLs struct {
 	Cardmarket string `json:"cardmarket"`
 	TCGPlayer string `json:"tcgplayer"`
 	MTGStocks string `json:"mtgstocks"`
+
+	hash hash.Hash
+	hashValid bool
 }
 
-func (purchaseURLs MTGCardPurchaseURLs) Hash() hash.Hash {
-	hashRes := fnv.New128a()
+func (purchaseURLs *MTGCardPurchaseURLs) Hash() hash.Hash {
+	if !purchaseURLs.hashValid {
+		purchaseURLs.hash = fnv.New128a()
 
-	hashRes.Write([]byte(purchaseURLs.Cardmarket))
-	hashRes.Write([]byte(purchaseURLs.TCGPlayer))
-	hashRes.Write([]byte(purchaseURLs.MTGStocks))
+		purchaseURLs.hash.Write([]byte(purchaseURLs.Cardmarket))
+		purchaseURLs.hash.Write([]byte(purchaseURLs.TCGPlayer))
+		purchaseURLs.hash.Write([]byte(purchaseURLs.MTGStocks))
 
-	return hashRes
+		purchaseURLs.hashValid = true
+	}
+
+	return purchaseURLs.hash
 }

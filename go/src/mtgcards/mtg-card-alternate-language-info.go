@@ -11,19 +11,26 @@ type MTGCardAlternateLanguageInfo struct {
 	Name string `json:"name"`
 	Text string `json:"text"`
 	Type string `json:"type"`
+
+	hash hash.Hash
+	hashValid bool
 }
 
-func (langInfo MTGCardAlternateLanguageInfo) Hash() hash.Hash {
-	hashRes := fnv.New128a()
+func (langInfo *MTGCardAlternateLanguageInfo) Hash() hash.Hash {
+	if !langInfo.hashValid {
+		langInfo.hash = fnv.New128a()
 
-	hashRes.Write([]byte(langInfo.FlavorText))
-	hashRes.Write([]byte(langInfo.Language))
-	binary.Write(hashRes, binary.BigEndian, langInfo.MultiverseId)
-	hashRes.Write([]byte(langInfo.Name))
-	hashRes.Write([]byte(langInfo.Text))
-	hashRes.Write([]byte(langInfo.Type))
+		langInfo.hash.Write([]byte(langInfo.FlavorText))
+		langInfo.hash.Write([]byte(langInfo.Language))
+		binary.Write(langInfo.hash, binary.BigEndian, langInfo.MultiverseId)
+		langInfo.hash.Write([]byte(langInfo.Name))
+		langInfo.hash.Write([]byte(langInfo.Text))
+		langInfo.hash.Write([]byte(langInfo.Type))
 
-	return hashRes
+		langInfo.hashValid = true
+	}
+
+	return langInfo.hash
 }
 
 type ByLanguage []MTGCardAlternateLanguageInfo

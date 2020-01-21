@@ -22,6 +22,8 @@ var insertPurchaseUrlQuery *sql.Stmt
 var insertRulingQuery *sql.Stmt
 var insertSetTranslationQuery *sql.Stmt
 var insertVariationQuery *sql.Stmt
+var setHashQuery *sql.Stmt
+var insertSetQuery *sql.Stmt
 
 func checkRowsAffected(res sql.Result, expectedAffected int64, errString string) error {
 	rowsAffected, err := res.RowsAffected()
@@ -197,6 +199,24 @@ func CreateDbQueries(db *sql.DB) error {
 		return err
 	}
 
+	fmt.Printf("Prepare query 17\n")
+	setHashQuery, err = db.Prepare("SELECT set_hash FROM sets WHERE code = ?")
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Prepare query 18\n")
+	insertSetQuery, err = db.Prepare(`INSERT INTO sets
+		(set_hash, base_size, block_name, code, is_foreign_only, is_foil_only,
+		is_online_only, is_partial_preview, keyrune_code, mcm_name, mcm_id,
+		mtgo_code, name, parent_code, release_date, tcgplayer_group_id,
+		total_set_size, set_type)
+		VALUES
+		(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -264,9 +284,54 @@ func CloseDbQueries() {
 	if insertVariationQuery != nil {
 		insertVariationQuery.Close()
 	}
+
+	if setHashQuery != nil {
+		setHashQuery.Close()
+	}
+
+	if insertSetQuery != nil {
+		insertSetQuery.Close()
+	}
 }
 
-func (card MTGCard) InsertFrameEffectToDb(frameEffect string) error {
+func (set *MTGSet) CheckIfSetExists() (bool, string, error) {
+	// First, check to see if this set is in the DB at all
+	setRows, err := setHashQuery.Query(set.Code)
+	if err != nil {
+		return false, "", err
+	}
+	defer setRows.Close()
+
+	if setRows.Next() {
+		// This set already exists in the db
+		// Get the hash associated with the existing set
+		var dbSetHash string
+		err := setRows.Scan(&dbSetHash)
+		if err != nil {
+			return false, "", err
+		}
+
+		return true, dbSetHash, nil
+	} else {
+		// This set doesn't exist in the db
+		return false, "", nil
+	}
+}
+
+func (set *MTGSet) InsertSetToDb(setHash string) error {
+	res, err := insertSetQuery.Exec(setHash, set.BaseSetSize, set.Block, set.Code, set.IsForeignOnly,
+		set.IsFoilOnly, set.IsOnlineOnly, set.IsPartialPreview, set.KeyruneCode, set.MCMName,
+		set.MCMId, set.MTGOCode, set.Name, set.ParentCode, set.ReleaseDate, set.TCGPlayerGroupId,
+		set.TotalSetSize, set.Type)
+	if err != nil {
+		return err
+	}
+
+	return checkRowsAffected(res, 1, "insert set")
+}
+
+
+func (card *MTGCard) InsertFrameEffectToDb(frameEffect string) error {
 	res, err := insertFrameEffectQuery.Exec(card.UUID, frameEffect)
 	if err != nil {
 		return err
@@ -311,7 +376,7 @@ func InsertPurchaseURLToDb(atomicPropertiesId int64, purchaseSiteId int, purchas
 	return checkRowsAffected(res, 1, "insert purchase url")
 }
 
-func (altLangInfo MTGCardAlternateLanguageInfo) InsertAltLangDataToDb(atomicPropertiesId int64) error {
+func (altLangInfo *MTGCardAlternateLanguageInfo) InsertAltLangDataToDb(atomicPropertiesId int64) error {
 	res, err := insertAltLangDataQuery.Exec(atomicPropertiesId, altLangInfo.FlavorText,
 		altLangInfo.Language, altLangInfo.MultiverseId, altLangInfo.Name,
 		altLangInfo.Text, altLangInfo.Type)
@@ -322,7 +387,7 @@ func (altLangInfo MTGCardAlternateLanguageInfo) InsertAltLangDataToDb(atomicProp
 	return checkRowsAffected(res, 1, "insert alt lang info")
 }
 
-func (ruling MTGCardRuling) InsertRulingToDb(atomicPropertiesId int64) error {
+func (ruling *MTGCardRuling) InsertRulingToDb(atomicPropertiesId int64) error {
 	res, err := insertRulingQuery.Exec(atomicPropertiesId, ruling.Date, ruling.Text)
 	if err != nil {
 		return err
@@ -358,7 +423,7 @@ func InsertSetTranslationToDb(setId int, translationLangId int, translatedName s
 	return checkRowsAffected(res, 1, "insert set name translation")
 }
 
-func (card MTGCard) InsertOtherFaceIdToDb(otherFaceUUID string) error {
+func (card *MTGCard) InsertOtherFaceIdToDb(otherFaceUUID string) error {
 	res, err := insertOtherFaceIdQuery.Exec(card.UUID, otherFaceUUID)
 	if err != nil {
 		return err
@@ -367,7 +432,7 @@ func (card MTGCard) InsertOtherFaceIdToDb(otherFaceUUID string) error {
 	return checkRowsAffected(res, 1, "insert other face ID")
 }
 
-func (card MTGCard) InsertVariationToDb(variationUUID string) error {
+func (card *MTGCard) InsertVariationToDb(variationUUID string) error {
 	res, err := insertVariationQuery.Exec(card.UUID, variationUUID)
 	if err != nil {
 		return err
@@ -376,7 +441,7 @@ func (card MTGCard) InsertVariationToDb(variationUUID string) error {
 	return checkRowsAffected(res, 1, "insert variation")
 }
 
-func (card MTGCard) InsertCardToDb(atomicPropertiesId int64) error {
+func (card *MTGCard) InsertCardToDb(atomicPropertiesId int64) error {
 	var duelDeck sql.NullString
 	var flavorText sql.NullString
 	var mtgArenaId sql.NullInt32
@@ -434,7 +499,7 @@ func (card MTGCard) InsertCardToDb(atomicPropertiesId int64) error {
 	return checkRowsAffected(res, 1, "insert card data")
 }
 
-func (card MTGCard) InsertAtomicPropertiesToDb(atomicPropertiesHash string) (int64, error) {
+func (card *MTGCard) InsertAtomicPropertiesToDb(atomicPropertiesHash string) (int64, error) {
 	// Build the set values needed for color_identity, color_indicator, and colors
 	var colorIdentity sql.NullString
 	var colorIndicator sql.NullString

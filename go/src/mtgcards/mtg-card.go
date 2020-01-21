@@ -111,45 +111,51 @@ type MTGCard struct {
 	MTGOFoilId int `json:"mtgoFoilId"`
 	MTGOId int `json:"mtgoId"`
 	OtherFaceIds []string `json:"otherFaceIds"`
+
+	atomicPropertiesHash hash.Hash
+	atomicPropertiesHashValid bool
+	hash hash.Hash
+	hashValid bool
+
 }
 
-func (card MTGCardCommon) AtomicPropertiesHash() hash.Hash {
-	hashRes := fnv.New128a()
+func (card *MTGCardCommon) AtomicPropertiesHash() hash.Hash {
+	hash := fnv.New128a()
 	for _, colorIdentity := range card.ColorIdentity {
-		hashRes.Write([]byte(colorIdentity))
+		hash.Write([]byte(colorIdentity))
 	}
 	for _, color := range card.Colors {
-		hashRes.Write([]byte(color))
+		hash.Write([]byte(color))
 	}
-	hashRes.Write([]byte(card.Layout))
-	hashRes.Write([]byte(card.Power))
-	hashRes.Write([]byte(card.ScryfallOracleId))
+	hash.Write([]byte(card.Layout))
+	hash.Write([]byte(card.Power))
+	hash.Write([]byte(card.ScryfallOracleId))
 	for _, subtype := range card.Subtypes {
-		hashRes.Write([]byte(subtype))
+		hash.Write([]byte(subtype))
 	}
 	for _, supertype := range card.Supertypes {
-		hashRes.Write([]byte(supertype))
+		hash.Write([]byte(supertype))
 	}
-	hashRes.Write([]byte(card.Text))
-	hashRes.Write([]byte(card.Toughness))
-	hashRes.Write([]byte(card.Type))
+	hash.Write([]byte(card.Text))
+	hash.Write([]byte(card.Toughness))
+	hash.Write([]byte(card.Type))
 	for _, cardType := range card.Types {
-		hashRes.Write([]byte(cardType))
+		hash.Write([]byte(cardType))
 	}
 	for _, colorIndicator := range card.ColorIndicator {
-		hashRes.Write([]byte(colorIndicator))
+		hash.Write([]byte(colorIndicator))
 	}
-	hashRes.Write([]byte(card.Loyalty))
-	hashRes.Write([]byte(card.Name))
+	hash.Write([]byte(card.Loyalty))
+	hash.Write([]byte(card.Name))
 	for _, name := range card.Names {
-		hashRes.Write([]byte(name))
+		hash.Write([]byte(name))
 	}
-	hashRes.Write([]byte(card.Side))
+	hash.Write([]byte(card.Side))
 
-	return hashRes
+	return hash
 }
 
-func (card MTGCardCommon) Canonicalize() {
+func (card *MTGCardCommon) Canonicalize() {
 	sort.Strings(card.ColorIdentity)
 	sort.Strings(card.Colors)
 	sort.Strings(card.Subtypes)
@@ -159,122 +165,130 @@ func (card MTGCardCommon) Canonicalize() {
 	sort.Strings(card.Names)
 }
 
-func (card MTGCard) AtomicPropertiesHash() hash.Hash {
-	hashRes := card.MTGCardCommon.AtomicPropertiesHash()
-	binary.Write(hashRes, binary.BigEndian, card.ConvertedManaCost)
-	binary.Write(hashRes, binary.BigEndian, card.FaceConvertedManaCost)
-	for _, languageData := range card.AlternateLanguageData {
-		languageDataHash := languageData.Hash()
-		languageDataHashBytes := make([]byte, 0, languageDataHash.Size())
-		hashRes.Write(languageDataHash.Sum(languageDataHashBytes))
+func (card *MTGCard) AtomicPropertiesHash() hash.Hash {
+	if !card.atomicPropertiesHashValid {
+		card.atomicPropertiesHash = card.MTGCardCommon.AtomicPropertiesHash()
+		binary.Write(card.atomicPropertiesHash, binary.BigEndian, card.ConvertedManaCost)
+		binary.Write(card.atomicPropertiesHash, binary.BigEndian, card.FaceConvertedManaCost)
+		for _, languageData := range card.AlternateLanguageData {
+			languageDataHash := languageData.Hash()
+			languageDataHashBytes := make([]byte, 0, languageDataHash.Size())
+			card.atomicPropertiesHash.Write(languageDataHash.Sum(languageDataHashBytes))
+		}
+
+		// Since go maps don't have a defined iteration order,
+		// Ensure a repeatable hash by sorting the keyset, and using
+		// that to define the iteration order
+		legalityFormats := make([]string, 0, len(card.Legalities))
+		for format, _ := range card.Legalities {
+			legalityFormats = append(legalityFormats, format)
+		}
+		sort.Strings(legalityFormats)
+		for _, format := range legalityFormats {
+			card.atomicPropertiesHash.Write([]byte(format))
+			card.atomicPropertiesHash.Write([]byte(card.Legalities[format]))
+		}
+
+		binary.Write(card.atomicPropertiesHash, binary.BigEndian, card.MTGStocksId)
+		for _, printing := range card.Printings {
+			card.atomicPropertiesHash.Write([]byte(printing))
+		}
+		purchaseURLsHash := card.PurchaseURLs.Hash()
+		purchaseURLsHashBytes := make([]byte, 0, purchaseURLsHash.Size())
+		card.atomicPropertiesHash.Write(purchaseURLsHash.Sum(purchaseURLsHashBytes))
+		for _, ruling := range card.Rulings {
+			rulingHash := ruling.Hash()
+			rulingHashBytes := make([]byte, 0, rulingHash.Size())
+			card.atomicPropertiesHash.Write(rulingHash.Sum(rulingHashBytes))
+		}
+		binary.Write(card.atomicPropertiesHash, binary.BigEndian, card.EDHRecRank)
+		card.atomicPropertiesHash.Write([]byte(card.Hand))
+		binary.Write(card.atomicPropertiesHash, binary.BigEndian, card.IsReserved)
+
+		// Since go maps don't have a defined iteration order,
+		// Ensure a repeatable hash by sorting the keyset, and using
+		// that to define the iteration order
+		leadershipFormats := make([]string, 0, len(card.LeadershipSkills))
+		for format, _ := range card.LeadershipSkills {
+			leadershipFormats = append(leadershipFormats, format)
+		}
+		sort.Strings(leadershipFormats)
+		for _, format := range leadershipFormats {
+			card.atomicPropertiesHash.Write([]byte(format))
+			binary.Write(card.atomicPropertiesHash, binary.BigEndian, card.LeadershipSkills[format])
+		}
+
+		card.atomicPropertiesHash.Write([]byte(card.Life))
+		card.atomicPropertiesHash.Write([]byte(card.Loyalty))
+		card.atomicPropertiesHash.Write([]byte(card.ManaCost))
+
+		card.atomicPropertiesHashValid = true
 	}
 
-	// Since go maps don't have a defined iteration order,
-	// Ensure a repeatable hash by sorting the keyset, and using
-	// that to define the iteration order
-	legalityFormats := make([]string, 0, len(card.Legalities))
-	for format, _ := range card.Legalities {
-		legalityFormats = append(legalityFormats, format)
-	}
-	sort.Strings(legalityFormats)
-	for _, format := range legalityFormats {
-		hashRes.Write([]byte(format))
-		hashRes.Write([]byte(card.Legalities[format]))
-	}
-
-	binary.Write(hashRes, binary.BigEndian, card.MTGStocksId)
-	for _, printing := range card.Printings {
-		hashRes.Write([]byte(printing))
-	}
-	purchaseURLsHash := card.PurchaseURLs.Hash()
-	purchaseURLsHashBytes := make([]byte, 0, purchaseURLsHash.Size())
-	hashRes.Write(purchaseURLsHash.Sum(purchaseURLsHashBytes))
-	for _, ruling := range card.Rulings {
-		rulingHash := ruling.Hash()
-		rulingHashBytes := make([]byte, 0, rulingHash.Size())
-		hashRes.Write(rulingHash.Sum(rulingHashBytes))
-	}
-	binary.Write(hashRes, binary.BigEndian, card.EDHRecRank)
-	hashRes.Write([]byte(card.Hand))
-	binary.Write(hashRes, binary.BigEndian, card.IsReserved)
-
-	// Since go maps don't have a defined iteration order,
-	// Ensure a repeatable hash by sorting the keyset, and using
-	// that to define the iteration order
-	leadershipFormats := make([]string, 0, len(card.LeadershipSkills))
-	for format, _ := range card.LeadershipSkills {
-		leadershipFormats = append(leadershipFormats, format)
-	}
-	sort.Strings(leadershipFormats)
-	for _, format := range leadershipFormats {
-		hashRes.Write([]byte(format))
-		binary.Write(hashRes, binary.BigEndian, card.LeadershipSkills[format])
-	}
-
-	hashRes.Write([]byte(card.Life))
-	hashRes.Write([]byte(card.Loyalty))
-	hashRes.Write([]byte(card.ManaCost))
-
-	return hashRes
+	return card.atomicPropertiesHash
 }
 
-func (card MTGCard) Hash() hash.Hash {
-	// Start with the hash of the atomic properties
-	hashRes := card.AtomicPropertiesHash()
+func (card *MTGCard) Hash() hash.Hash {
+	if !card.hashValid {
+		// Start with the hash of the atomic properties
+		card.hash = card.AtomicPropertiesHash()
 
-	// Next do the card common properties
-	hashRes.Write([]byte(card.Artist))
-	hashRes.Write([]byte(card.BorderColor))
-	hashRes.Write([]byte(card.Number))
-	hashRes.Write([]byte(card.ScryfallId))
-	hashRes.Write([]byte(card.UUID))
-	hashRes.Write([]byte(card.Watermark))
-	binary.Write(hashRes, binary.BigEndian, card.IsOnlineOnly)
-	hashRes.Write([]byte(card.ScryfallIllustrationId))
+		// Next do the card common properties
+		card.hash.Write([]byte(card.Artist))
+		card.hash.Write([]byte(card.BorderColor))
+		card.hash.Write([]byte(card.Number))
+		card.hash.Write([]byte(card.ScryfallId))
+		card.hash.Write([]byte(card.UUID))
+		card.hash.Write([]byte(card.Watermark))
+		binary.Write(card.hash, binary.BigEndian, card.IsOnlineOnly)
+		card.hash.Write([]byte(card.ScryfallIllustrationId))
 
-	// Last, do the rest of the card properties
-	for _, frameEffect := range card.FrameEffects {
-		hashRes.Write([]byte(frameEffect))
-	}
-	hashRes.Write([]byte(card.FrameVersion))
-	binary.Write(hashRes, binary.BigEndian, card.MCMId)
-	binary.Write(hashRes, binary.BigEndian, card.MCMMetaId)
-	binary.Write(hashRes, binary.BigEndian, card.MultiverseId)
-	hashRes.Write([]byte(card.OriginalText))
-	hashRes.Write([]byte(card.OriginalType))
-	hashRes.Write([]byte(card.Rarity))
-	binary.Write(hashRes, binary.BigEndian, card.TCGPlayerProductId)
-	for _, variation := range card.Variations {
-		hashRes.Write([]byte(variation))
-	}
-	hashRes.Write([]byte(card.DuelDeck))
-	hashRes.Write([]byte(card.FlavorText))
-	binary.Write(hashRes, binary.BigEndian, card.HasFoil)
-	binary.Write(hashRes, binary.BigEndian, card.HasNonFoil)
-	binary.Write(hashRes, binary.BigEndian, card.IsAlternative)
-	binary.Write(hashRes, binary.BigEndian, card.IsArena)
-	binary.Write(hashRes, binary.BigEndian, card.IsFullArt)
-	binary.Write(hashRes, binary.BigEndian, card.IsMTGO)
-	binary.Write(hashRes, binary.BigEndian, card.IsOnlineOnly)
-	binary.Write(hashRes, binary.BigEndian, card.IsOversized)
-	binary.Write(hashRes, binary.BigEndian, card.IsPaper)
-	binary.Write(hashRes, binary.BigEndian, card.IsPromo)
-	binary.Write(hashRes, binary.BigEndian, card.IsReprint)
-	binary.Write(hashRes, binary.BigEndian, card.IsStarter)
-	binary.Write(hashRes, binary.BigEndian, card.IsStorySpotlight)
-	binary.Write(hashRes, binary.BigEndian, card.IsTextless)
-	binary.Write(hashRes, binary.BigEndian, card.IsTimeshifted)
-	binary.Write(hashRes, binary.BigEndian, card.MTGArenaId)
-	binary.Write(hashRes, binary.BigEndian, card.MTGOFoilId)
-	binary.Write(hashRes, binary.BigEndian, card.MTGOId)
-	for _, otherFace := range card.OtherFaceIds {
-		hashRes.Write([]byte(otherFace))
+		// Last, do the rest of the card properties
+		for _, frameEffect := range card.FrameEffects {
+			card.hash.Write([]byte(frameEffect))
+		}
+		card.hash.Write([]byte(card.FrameVersion))
+		binary.Write(card.hash, binary.BigEndian, card.MCMId)
+		binary.Write(card.hash, binary.BigEndian, card.MCMMetaId)
+		binary.Write(card.hash, binary.BigEndian, card.MultiverseId)
+		card.hash.Write([]byte(card.OriginalText))
+		card.hash.Write([]byte(card.OriginalType))
+		card.hash.Write([]byte(card.Rarity))
+		binary.Write(card.hash, binary.BigEndian, card.TCGPlayerProductId)
+		for _, variation := range card.Variations {
+			card.hash.Write([]byte(variation))
+		}
+		card.hash.Write([]byte(card.DuelDeck))
+		card.hash.Write([]byte(card.FlavorText))
+		binary.Write(card.hash, binary.BigEndian, card.HasFoil)
+		binary.Write(card.hash, binary.BigEndian, card.HasNonFoil)
+		binary.Write(card.hash, binary.BigEndian, card.IsAlternative)
+		binary.Write(card.hash, binary.BigEndian, card.IsArena)
+		binary.Write(card.hash, binary.BigEndian, card.IsFullArt)
+		binary.Write(card.hash, binary.BigEndian, card.IsMTGO)
+		binary.Write(card.hash, binary.BigEndian, card.IsOnlineOnly)
+		binary.Write(card.hash, binary.BigEndian, card.IsOversized)
+		binary.Write(card.hash, binary.BigEndian, card.IsPaper)
+		binary.Write(card.hash, binary.BigEndian, card.IsPromo)
+		binary.Write(card.hash, binary.BigEndian, card.IsReprint)
+		binary.Write(card.hash, binary.BigEndian, card.IsStarter)
+		binary.Write(card.hash, binary.BigEndian, card.IsStorySpotlight)
+		binary.Write(card.hash, binary.BigEndian, card.IsTextless)
+		binary.Write(card.hash, binary.BigEndian, card.IsTimeshifted)
+		binary.Write(card.hash, binary.BigEndian, card.MTGArenaId)
+		binary.Write(card.hash, binary.BigEndian, card.MTGOFoilId)
+		binary.Write(card.hash, binary.BigEndian, card.MTGOId)
+		for _, otherFace := range card.OtherFaceIds {
+			card.hash.Write([]byte(otherFace))
+		}
+
+		card.hashValid = true
 	}
 
-	return hashRes
+	return card.hash
 }
 
-func (card MTGCard) Canonicalize() {
+func (card *MTGCard) Canonicalize() {
 	card.MTGCardCommon.Canonicalize()
 	sort.Sort(ByLanguage(card.AlternateLanguageData))
 	sort.Strings(card.Printings)
@@ -284,7 +298,7 @@ func (card MTGCard) Canonicalize() {
 	sort.Strings(card.OtherFaceIds)
 }
 
-func (card MTGCard) String() string {
+func (card *MTGCard) String() string {
 	var builder strings.Builder
 	fmt.Fprintf(&builder, "Card: %s\n", card.Name)
 	fmt.Fprintf(&builder, "\tNames: %s\n", card.Names)

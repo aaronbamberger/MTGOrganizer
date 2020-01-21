@@ -6,15 +6,22 @@ import "hash/fnv"
 type MTGCardRuling struct {
 	Date string `json:"date"`
 	Text string `json:"text"`
+
+	hash hash.Hash
+	hashValid bool
 }
 
-func (ruling MTGCardRuling) Hash() hash.Hash {
-	hashRes := fnv.New128a()
+func (ruling *MTGCardRuling) Hash() hash.Hash {
+	if !ruling.hashValid {
+		ruling.hash = fnv.New128a()
 
-	hashRes.Write([]byte(ruling.Date))
-	hashRes.Write([]byte(ruling.Text))
+		ruling.hash.Write([]byte(ruling.Date))
+		ruling.hash.Write([]byte(ruling.Text))
 
-	return hashRes
+		ruling.hashValid = true
+	}
+
+	return ruling.hash
 }
 
 type ByDate []MTGCardRuling
