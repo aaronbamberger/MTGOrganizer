@@ -37,35 +37,6 @@ func main() {
 	}
 	defer mtgcards.CloseDbQueries()
 
-	// Fetch some things from the db for future use
-	gameFormats, err := mtgcards.GetGameFormats(db)
-	if err != nil {
-		log.Print(err)
-		return
-	}
-	legalityOptions, err := mtgcards.GetLegalityOptions(db)
-	if err != nil {
-		log.Print(err)
-		return
-	}
-	purchaseSites, err := mtgcards.GetPurchaseSites(db)
-	if err != nil {
-		log.Print(err)
-		return
-	}
-	/*
-	setTranslationLanguages, err := mtgcards.GetSetTranslationLanguages(db)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	*/
-	leadershipFormats, err := mtgcards.GetLeadershipFormats(db)
-	if err != nil {
-		log.Print(err)
-		return
-	}
-
 	totalSets := len(allSets)
 	currentSet := 1
 	//set := allSets["7ED"]
@@ -78,17 +49,14 @@ func main() {
 		log.Printf("Processing set with code %s (%d of %d)\n", set.Code, currentSet, totalSets)
 		currentSet += 1
 		setWaitGroup.Add(1)
-		go ProcessSet(set, &setWaitGroup, &dbLock,
-			leadershipFormats, gameFormats, legalityOptions, purchaseSites)
+		go ProcessSet(set, &setWaitGroup, &dbLock)
 	}
 	//_, _ = reader.ReadString('\n')
 	log.Printf("Waiting on all set goroutines to finish\n")
 	setWaitGroup.Wait()
 }
 
-func ProcessSet(set mtgcards.MTGSet, wg *sync.WaitGroup, dbLock *sync.RWMutex,
-		leadershipFormats map[string]int, gameFormats map[string]int,
-		legalityOptions map[string]int, purchaseSites map[string]int) {
+func ProcessSet(set mtgcards.MTGSet, wg *sync.WaitGroup, dbLock *sync.RWMutex) {
 	// Hash the set for later use
 	set.Canonicalize()
 	setHash := mtgcards.HashToHexString(set.Hash())
@@ -176,8 +144,8 @@ func ProcessSet(set mtgcards.MTGSet, wg *sync.WaitGroup, dbLock *sync.RWMutex,
 
 			// Leadership skills
 			for leadershipFormat, leaderValid := range card.LeadershipSkills {
-				err = mtgcards.InsertLeadershipSkillToDb(atomicPropId,
-					leadershipFormats[leadershipFormat], leaderValid, dbLock)
+				err = mtgcards.InsertLeadershipSkillToDb(atomicPropId, leadershipFormat,
+					leaderValid, dbLock)
 				if err != nil {
 					log.Print(err)
 				}
@@ -185,8 +153,7 @@ func ProcessSet(set mtgcards.MTGSet, wg *sync.WaitGroup, dbLock *sync.RWMutex,
 
 			// Legalities
 			for format, legality := range card.Legalities {
-				err = mtgcards.InsertLegalityToDb(atomicPropId,
-					gameFormats[format], legalityOptions[legality], dbLock)
+				err = mtgcards.InsertLegalityToDb(atomicPropId, format, legality, dbLock)
 				if err != nil {
 					log.Print(err)
 				}
@@ -209,18 +176,18 @@ func ProcessSet(set mtgcards.MTGSet, wg *sync.WaitGroup, dbLock *sync.RWMutex,
 			}
 
 			// Purchase URLs
-			err = mtgcards.InsertPurchaseURLToDb(atomicPropId,
-				purchaseSites["cardmarket"], card.PurchaseURLs.Cardmarket, dbLock)
+			err = mtgcards.InsertPurchaseURLToDb(atomicPropId, "cardmarket",
+				card.PurchaseURLs.Cardmarket, dbLock)
 			if err != nil {
 				log.Print(err)
 			}
-			err = mtgcards.InsertPurchaseURLToDb(atomicPropId,
-				purchaseSites["tcgplayer"], card.PurchaseURLs.TCGPlayer, dbLock)
+			err = mtgcards.InsertPurchaseURLToDb(atomicPropId, "tcgplayer",
+				card.PurchaseURLs.TCGPlayer, dbLock)
 			if err != nil {
 				log.Print(err)
 			}
-			err = mtgcards.InsertPurchaseURLToDb(atomicPropId,
-				purchaseSites["mtgstocks"], card.PurchaseURLs.MTGStocks, dbLock)
+			err = mtgcards.InsertPurchaseURLToDb(atomicPropId, "mtgstocks",
+				card.PurchaseURLs.MTGStocks, dbLock)
 			if err != nil {
 				log.Print(err)
 			}

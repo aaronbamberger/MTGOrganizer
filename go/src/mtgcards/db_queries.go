@@ -25,6 +25,18 @@ var insertSetTranslationQuery *sql.Stmt
 var insertVariationQuery *sql.Stmt
 var setHashQuery *sql.Stmt
 var insertSetQuery *sql.Stmt
+var insertGameFormatQuery *sql.Stmt
+var insertLegalityOptionQuery *sql.Stmt
+var insertPurchaseSiteQuery *sql.Stmt
+var insertLeadershipFormatQuery *sql.Stmt
+var insertSetTranslationLanguageQuery *sql.Stmt
+
+var gameFormats sync.Map
+var legalityOptions sync.Map
+var purchaseSites sync.Map
+var leadershipFormats sync.Map
+var setTranslationLanguages sync.Map
+//var frameEffectOptions sync.Map
 
 func checkRowsAffected(res sql.Result, expectedAffected int64, errString string) error {
 	rowsAffected, err := res.RowsAffected()
@@ -218,6 +230,71 @@ func CreateDbQueries(db *sql.DB) error {
 		return err
 	}
 
+	insertGameFormatQuery, err = db.Prepare(`INSERT INTO game_formats
+		(game_format_name)
+		VALUES
+		(?)`)
+	if err != nil {
+		return err
+	}
+
+	insertLegalityOptionQuery, err = db.Prepare(`INSERT INTO legality_options
+		(legality_option_name)
+		VALUES
+		(?)`)
+	if err != nil {
+		return err
+	}
+
+	insertPurchaseSiteQuery, err = db.Prepare(`INSERT INTO purchase_sites
+		(purchase_site_name)
+		VALUES
+		(?)`)
+	if err != nil {
+		return err
+	}
+
+	insertLeadershipFormatQuery, err = db.Prepare(`INSERT INTO leadership_formats
+		(leadership_format_name)
+		VALUES
+		(?)`)
+	if err != nil {
+		return err
+	}
+
+	insertSetTranslationLanguageQuery, err = db.Prepare(`INSERT INTO set_translation_languages
+		(set_translation_language)
+		VALUES
+		(?)`)
+	if err != nil {
+		return err
+	}
+
+	err = populateGameFormatsCache(db)
+	if err != nil {
+		return err
+	}
+
+	err = populateLegalityOptionsCache(db)
+	if err != nil {
+		return err
+	}
+
+	err = populatePurchaseSitesCache(db)
+	if err != nil {
+		return err
+	}
+
+	err = populateLeadershipFormatsCache(db)
+	if err != nil {
+		return err
+	}
+
+	err = populateSetTranslationLanguagesCache(db)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -293,6 +370,26 @@ func CloseDbQueries() {
 	if insertSetQuery != nil {
 		insertSetQuery.Close()
 	}
+
+	if insertGameFormatQuery != nil {
+		insertGameFormatQuery.Close()
+	}
+
+	if insertLegalityOptionQuery != nil {
+		insertLegalityQuery.Close()
+	}
+
+	if insertPurchaseSiteQuery != nil {
+		insertPurchaseSiteQuery.Close()
+	}
+
+	if insertLeadershipFormatQuery != nil {
+		insertLeadershipFormatQuery.Close()
+	}
+
+	if insertSetTranslationLanguageQuery != nil {
+		insertSetTranslationLanguageQuery.Close()
+	}
 }
 
 func (set *MTGSet) CheckIfSetExists(lock *sync.RWMutex) (bool, string, error) {
@@ -348,8 +445,30 @@ func (card *MTGCard) InsertFrameEffectToDb(frameEffect string, lock *sync.RWMute
 	return checkRowsAffected(res, 1, "insert frame effect")
 }
 
-func InsertLeadershipSkillToDb(atomicPropertiesId int64, leadershipFormatId int, leaderLegal bool,
+func InsertLeadershipSkillToDb(atomicPropertiesId int64, leadershipFormat string, leaderLegal bool,
 		lock *sync.RWMutex) error {
+	// Get the leadership format id from the cache
+	var leadershipFormatId int64
+	leadershipFormatIdTemp, loaded := leadershipFormats.Load(leadershipFormat)
+	if !loaded {
+		// This is the unlikely case where we have a new value that isn't pre-populated in the db
+		lock.RLock()
+		res, err := insertLeadershipFormatQuery.Exec(leadershipFormat)
+		lock.RUnlock()
+		if err != nil {
+			return err
+		}
+
+		leadershipFormatId, err = res.LastInsertId()
+		if err != nil {
+			return err
+		}
+		leadershipFormats.Store(leadershipFormat, leadershipFormatId)
+	} else {
+		leadershipFormatId = leadershipFormatIdTemp.(int64)
+	}
+
+
 	lock.RLock()
 	res, err := insertLeadershipSkillQuery.Exec(atomicPropertiesId, leadershipFormatId, leaderLegal)
 	lock.RUnlock()
@@ -360,8 +479,50 @@ func InsertLeadershipSkillToDb(atomicPropertiesId int64, leadershipFormatId int,
 	return checkRowsAffected(res, 1, "insert leadership skill")
 }
 
-func InsertLegalityToDb(atomicPropertiesId int64, gameFormatId int, legalityOptionId int,
+func InsertLegalityToDb(atomicPropertiesId int64, gameFormat string, legalityOption string,
 		lock *sync.RWMutex) error {
+	// Get the game format id from the cache
+	var gameFormatId int64
+	gameFormatIdTemp, loaded := gameFormats.Load(gameFormat)
+	if !loaded {
+		// This is the unlikely case where we have a new value that isn't pre-populated in the db
+		lock.RLock()
+		res, err := insertGameFormatQuery.Exec(gameFormat)
+		lock.RUnlock()
+		if err != nil {
+			return err
+		}
+
+		gameFormatId, err = res.LastInsertId()
+		if err != nil {
+			return err
+		}
+		gameFormats.Store(gameFormat, gameFormatId)
+	} else {
+		gameFormatId = gameFormatIdTemp.(int64)
+	}
+
+	// Get the legality option id from the cache
+	var legalityOptionId int64
+	legalityOptionIdTemp, loaded := legalityOptions.Load(legalityOption)
+	if !loaded {
+		// This is the unlikely case where we have a new value that isn't pre-populated in the db
+		lock.RLock()
+		res, err := insertLegalityOptionQuery.Exec(legalityOption)
+		lock.RUnlock()
+		if err != nil {
+			return err
+		}
+
+		legalityOptionId, err = res.LastInsertId()
+		if err != nil {
+			return err
+		}
+		legalityOptions.Store(legalityOption, legalityOptionId)
+	} else {
+		legalityOptionId = legalityOptionIdTemp.(int64)
+	}
+
 	lock.RLock()
 	res, err := insertLegalityQuery.Exec(atomicPropertiesId, gameFormatId, legalityOptionId)
 	lock.RUnlock()
@@ -383,8 +544,29 @@ func InsertCardPrintingToDb(atomicPropertiesId int64, setCode string, lock *sync
 	return checkRowsAffected(res, 1, "insert card printing")
 }
 
-func InsertPurchaseURLToDb(atomicPropertiesId int64, purchaseSiteId int, purchaseURL string,
+func InsertPurchaseURLToDb(atomicPropertiesId int64, purchaseSite string, purchaseURL string,
 		lock *sync.RWMutex) error {
+	// Get the purchase site id from the cache
+	var purchaseSiteId int64
+	purchaseSiteIdTemp, loaded := purchaseSites.Load(purchaseSite)
+	if !loaded {
+		// This is the unlikely case where we have a new value that isn't pre-populated in the db
+		lock.RLock()
+		res, err := insertPurchaseSiteQuery.Exec(purchaseSite)
+		lock.RUnlock()
+		if err != nil {
+			return err
+		}
+
+		purchaseSiteId, err = res.LastInsertId()
+		if err != nil {
+			return err
+		}
+		purchaseSites.Store(purchaseSite, purchaseSiteId)
+	} else {
+		purchaseSiteId = purchaseSiteIdTemp.(int64)
+	}
+
 	lock.RLock()
 	res, err := insertPurchaseUrlQuery.Exec(atomicPropertiesId, purchaseSiteId, purchaseURL)
 	lock.RUnlock()
@@ -635,166 +817,156 @@ func (card *MTGCard) InsertAtomicPropertiesToDb(atomicPropertiesHash string,
 	return lastInsertId, nil
 }
 
-func GetGameFormats(db *sql.DB) (map[string]int, error) {
+func populateGameFormatsCache(db *sql.DB) error {
 	retrieveGameFormatsQuery, err := db.Prepare(`SELECT game_format_id, game_format_name
 		FROM game_formats`)
 	defer retrieveGameFormatsQuery.Close()
 	if err != nil {
-		return nil, err
+		return err
 	}
-
-	gameFormats := make(map[string]int)
 
 	gameFormatRows, err := retrieveGameFormatsQuery.Query()
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer gameFormatRows.Close()
 
 	for gameFormatRows.Next() {
 		if err := gameFormatRows.Err(); err != nil {
-			return nil, err
+			return err
 		}
 
-		var gameFormatId int
+		var gameFormatId int64
 		var gameFormatName string
 		err := gameFormatRows.Scan(&gameFormatId, &gameFormatName)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		gameFormats[gameFormatName] = gameFormatId
+		gameFormats.Store(gameFormatName, gameFormatId)
 	}
 
-	return gameFormats, nil
+	return nil
 }
 
-func GetLegalityOptions(db *sql.DB) (map[string]int, error) {
+func populateLegalityOptionsCache(db *sql.DB) error {
 	retrieveLegalityOptionsQuery, err := db.Prepare(`SELECT legality_option_id, legality_option_name
 		FROM legality_options`)
 	defer retrieveLegalityOptionsQuery.Close()
 	if err != nil {
-		return nil, err
+		return err
 	}
-
-	legalityOptions := make(map[string]int)
 
 	legalityOptionsRows, err := retrieveLegalityOptionsQuery.Query()
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer legalityOptionsRows.Close()
 
 	for legalityOptionsRows.Next() {
 		if err := legalityOptionsRows.Err(); err != nil {
-			return nil, err
+			return err
 		}
 
-		var legalityOptionId int
+		var legalityOptionId int64
 		var legalityOptionName string
 		err := legalityOptionsRows.Scan(&legalityOptionId, &legalityOptionName)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		legalityOptions[legalityOptionName] = legalityOptionId
+		legalityOptions.Store(legalityOptionName, legalityOptionId)
 	}
 
-	return legalityOptions, nil
+	return nil
 }
 
-func GetPurchaseSites(db *sql.DB) (map[string]int, error) {
+func populatePurchaseSitesCache(db *sql.DB) error {
 	retrievePurchaseSitesQuery, err := db.Prepare(`SELECT purchase_site_id, purchase_site_name
 		FROM purchase_sites`)
 	defer retrievePurchaseSitesQuery.Close()
 	if err != nil {
-		return nil, err
+		return err
 	}
-
-	purchaseSites := make(map[string]int)
 
 	purchaseSitesRows, err := retrievePurchaseSitesQuery.Query()
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer purchaseSitesRows.Close()
 
 	for purchaseSitesRows.Next() {
 		if err := purchaseSitesRows.Err(); err != nil {
-			return nil, err
+			return err
 		}
 
-		var purchaseSiteId int
+		var purchaseSiteId int64
 		var purchaseSiteName string
 		err := purchaseSitesRows.Scan(&purchaseSiteId, &purchaseSiteName)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		purchaseSites[purchaseSiteName] = purchaseSiteId
+		purchaseSites.Store(purchaseSiteName, purchaseSiteId)
 	}
 
-	return purchaseSites, nil
+	return nil
 }
 
-func GetSetTranslationLanguages(db *sql.DB) (map[string]int, error) {
+func populateSetTranslationLanguagesCache(db *sql.DB) error {
 	retrieveSetTranslationLanguagesQuery, err := db.Prepare(`SELECT set_translation_language_id,
 		set_translation_language FROM set_translation_languages`)
 	defer retrieveSetTranslationLanguagesQuery.Close()
 	if err != nil {
-		return nil, err
+		return err
 	}
-
-	setTranslationLanguages := make(map[string]int)
 
 	setTranslationLanguagesRows, err := retrieveSetTranslationLanguagesQuery.Query()
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer setTranslationLanguagesRows.Close()
 
 	for setTranslationLanguagesRows.Next() {
 		if err := setTranslationLanguagesRows.Err(); err != nil {
-			return nil, err
+			return err
 		}
 
-		var setTranslationLanguageId int
+		var setTranslationLanguageId int64
 		var setTranslationLanguage string
 		err := setTranslationLanguagesRows.Scan(&setTranslationLanguageId, &setTranslationLanguage)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		setTranslationLanguages[setTranslationLanguage] = setTranslationLanguageId
+		setTranslationLanguages.Store(setTranslationLanguage, setTranslationLanguageId)
 	}
 
-	return setTranslationLanguages, nil
+	return nil
 }
 
-func GetLeadershipFormats(db *sql.DB) (map[string]int, error) {
+func populateLeadershipFormatsCache(db *sql.DB) error {
 	retrieveLeadershipFormatsQuery, err := db.Prepare(`SELECT leadership_format_id,
 		leadership_format_name FROM leadership_formats`)
 	defer retrieveLeadershipFormatsQuery.Close()
 
-	leadershipFormats := make(map[string]int)
-
 	leadershipFormatsRows, err := retrieveLeadershipFormatsQuery.Query()
 	if err != nil {
-		return nil, err
+		return  err
 	}
 	defer leadershipFormatsRows.Close()
 
 	for leadershipFormatsRows.Next() {
 		if err := leadershipFormatsRows.Err(); err != nil {
-			return nil, err
+			return err
 		}
 
-		var leadershipFormatId int
+		var leadershipFormatId int64
 		var leadershipFormatName string
 		err := leadershipFormatsRows.Scan(&leadershipFormatId, &leadershipFormatName)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		leadershipFormats[leadershipFormatName] = leadershipFormatId
+		leadershipFormats.Store(leadershipFormatName, leadershipFormatId)
 	}
 
-	return leadershipFormats, nil
+	return nil
 }
 
 func GetAtomicPropertiesId(atomicPropertiesHash string, card *MTGCard,
