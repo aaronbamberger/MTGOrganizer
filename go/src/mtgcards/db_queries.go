@@ -5,6 +5,7 @@ import "encoding/hex"
 import "fmt"
 import "hash"
 import "strings"
+import "sync"
 
 var atomicPropertiesIdQuery *sql.Stmt
 var insertAtomicPropertiesQuery *sql.Stmt
@@ -294,7 +295,10 @@ func CloseDbQueries() {
 	}
 }
 
-func (set *MTGSet) CheckIfSetExists() (bool, string, error) {
+func (set *MTGSet) CheckIfSetExists(lock *sync.RWMutex) (bool, string, error) {
+	lock.Lock()
+	defer lock.Unlock()
+
 	// First, check to see if this set is in the DB at all
 	setRows, err := setHashQuery.Query(set.Code)
 	if err != nil {
@@ -318,11 +322,13 @@ func (set *MTGSet) CheckIfSetExists() (bool, string, error) {
 	}
 }
 
-func (set *MTGSet) InsertSetToDb(setHash string) error {
+func (set *MTGSet) InsertSetToDb(setHash string, lock *sync.RWMutex) error {
+	lock.RLock()
 	res, err := insertSetQuery.Exec(setHash, set.BaseSetSize, set.Block, set.Code, set.IsForeignOnly,
 		set.IsFoilOnly, set.IsOnlineOnly, set.IsPartialPreview, set.KeyruneCode, set.MCMName,
 		set.MCMId, set.MTGOCode, set.Name, set.ParentCode, set.ReleaseDate, set.TCGPlayerGroupId,
 		set.TotalSetSize, set.Type)
+	lock.RUnlock()
 	if err != nil {
 		return err
 	}
@@ -331,8 +337,10 @@ func (set *MTGSet) InsertSetToDb(setHash string) error {
 }
 
 
-func (card *MTGCard) InsertFrameEffectToDb(frameEffect string) error {
+func (card *MTGCard) InsertFrameEffectToDb(frameEffect string, lock *sync.RWMutex) error {
+	lock.RLock()
 	res, err := insertFrameEffectQuery.Exec(card.UUID, frameEffect)
+	lock.RUnlock()
 	if err != nil {
 		return err
 	}
@@ -340,8 +348,11 @@ func (card *MTGCard) InsertFrameEffectToDb(frameEffect string) error {
 	return checkRowsAffected(res, 1, "insert frame effect")
 }
 
-func InsertLeadershipSkillToDb(atomicPropertiesId int64, leadershipFormatId int, leaderLegal bool) error {
+func InsertLeadershipSkillToDb(atomicPropertiesId int64, leadershipFormatId int, leaderLegal bool,
+		lock *sync.RWMutex) error {
+	lock.RLock()
 	res, err := insertLeadershipSkillQuery.Exec(atomicPropertiesId, leadershipFormatId, leaderLegal)
+	lock.RUnlock()
 	if err != nil {
 		return err
 	}
@@ -349,8 +360,11 @@ func InsertLeadershipSkillToDb(atomicPropertiesId int64, leadershipFormatId int,
 	return checkRowsAffected(res, 1, "insert leadership skill")
 }
 
-func InsertLegalityToDb(atomicPropertiesId int64, gameFormatId int, legalityOptionId int) error {
+func InsertLegalityToDb(atomicPropertiesId int64, gameFormatId int, legalityOptionId int,
+		lock *sync.RWMutex) error {
+	lock.RLock()
 	res, err := insertLegalityQuery.Exec(atomicPropertiesId, gameFormatId, legalityOptionId)
+	lock.RUnlock()
 	if err != nil {
 		return err
 	}
@@ -358,8 +372,10 @@ func InsertLegalityToDb(atomicPropertiesId int64, gameFormatId int, legalityOpti
 	return checkRowsAffected(res, 1, "insert legality")
 }
 
-func InsertCardPrintingToDb(atomicPropertiesId int64, setCode string) error {
+func InsertCardPrintingToDb(atomicPropertiesId int64, setCode string, lock *sync.RWMutex) error {
+	lock.RLock()
 	res, err := insertCardPrintingQuery.Exec(atomicPropertiesId, setCode)
+	lock.RUnlock()
 	if err != nil {
 		return err
 	}
@@ -367,8 +383,11 @@ func InsertCardPrintingToDb(atomicPropertiesId int64, setCode string) error {
 	return checkRowsAffected(res, 1, "insert card printing")
 }
 
-func InsertPurchaseURLToDb(atomicPropertiesId int64, purchaseSiteId int, purchaseURL string) error {
+func InsertPurchaseURLToDb(atomicPropertiesId int64, purchaseSiteId int, purchaseURL string,
+		lock *sync.RWMutex) error {
+	lock.RLock()
 	res, err := insertPurchaseUrlQuery.Exec(atomicPropertiesId, purchaseSiteId, purchaseURL)
+	lock.RUnlock()
 	if err != nil {
 		return err
 	}
@@ -376,10 +395,13 @@ func InsertPurchaseURLToDb(atomicPropertiesId int64, purchaseSiteId int, purchas
 	return checkRowsAffected(res, 1, "insert purchase url")
 }
 
-func (altLangInfo *MTGCardAlternateLanguageInfo) InsertAltLangDataToDb(atomicPropertiesId int64) error {
+func (altLangInfo *MTGCardAlternateLanguageInfo) InsertAltLangDataToDb(atomicPropertiesId int64,
+		lock *sync.RWMutex) error {
+	lock.RLock()
 	res, err := insertAltLangDataQuery.Exec(atomicPropertiesId, altLangInfo.FlavorText,
 		altLangInfo.Language, altLangInfo.MultiverseId, altLangInfo.Name,
 		altLangInfo.Text, altLangInfo.Type)
+	lock.RUnlock()
 	if err != nil {
 		return err
 	}
@@ -387,8 +409,10 @@ func (altLangInfo *MTGCardAlternateLanguageInfo) InsertAltLangDataToDb(atomicPro
 	return checkRowsAffected(res, 1, "insert alt lang info")
 }
 
-func (ruling *MTGCardRuling) InsertRulingToDb(atomicPropertiesId int64) error {
+func (ruling *MTGCardRuling) InsertRulingToDb(atomicPropertiesId int64, lock *sync.RWMutex) error {
+	lock.RLock()
 	res, err := insertRulingQuery.Exec(atomicPropertiesId, ruling.Date, ruling.Text)
+	lock.RUnlock()
 	if err != nil {
 		return err
 	}
@@ -396,8 +420,10 @@ func (ruling *MTGCardRuling) InsertRulingToDb(atomicPropertiesId int64) error {
 	return checkRowsAffected(res, 1, "insert ruling")
 }
 
-func InsertCardSubtypeToDb(atomicPropertiesId int64, subtype string) error {
+func InsertCardSubtypeToDb(atomicPropertiesId int64, subtype string, lock *sync.RWMutex) error {
+	lock.RLock()
 	res, err := insertCardSubtypeQuery.Exec(atomicPropertiesId, subtype)
+	lock.RUnlock()
 	if err != nil {
 		return err
 	}
@@ -405,8 +431,10 @@ func InsertCardSubtypeToDb(atomicPropertiesId int64, subtype string) error {
 	return checkRowsAffected(res, 1, "insert subtype")
 }
 
-func InsertCardSupertypeToDb(atomicPropertiesId int64, supertype string) error {
+func InsertCardSupertypeToDb(atomicPropertiesId int64, supertype string, lock *sync.RWMutex) error {
+	lock.RLock()
 	res, err := insertCardSupertypeQuery.Exec(atomicPropertiesId, supertype)
+	lock.RUnlock()
 	if err != nil {
 		return err
 	}
@@ -414,8 +442,11 @@ func InsertCardSupertypeToDb(atomicPropertiesId int64, supertype string) error {
 	return checkRowsAffected(res, 1, "insert supertype")
 }
 
-func InsertSetTranslationToDb(setId int, translationLangId int, translatedName string) error {
+func InsertSetTranslationToDb(setId int, translationLangId int, translatedName string,
+		lock *sync.RWMutex) error {
+	lock.RLock()
 	res, err := insertSetTranslationQuery.Exec(setId, translationLangId, translatedName)
+	lock.RUnlock()
 	if err != nil {
 		return err
 	}
@@ -423,8 +454,10 @@ func InsertSetTranslationToDb(setId int, translationLangId int, translatedName s
 	return checkRowsAffected(res, 1, "insert set name translation")
 }
 
-func (card *MTGCard) InsertOtherFaceIdToDb(otherFaceUUID string) error {
+func (card *MTGCard) InsertOtherFaceIdToDb(otherFaceUUID string, lock *sync.RWMutex) error {
+	lock.RLock()
 	res, err := insertOtherFaceIdQuery.Exec(card.UUID, otherFaceUUID)
+	lock.RUnlock()
 	if err != nil {
 		return err
 	}
@@ -432,8 +465,10 @@ func (card *MTGCard) InsertOtherFaceIdToDb(otherFaceUUID string) error {
 	return checkRowsAffected(res, 1, "insert other face ID")
 }
 
-func (card *MTGCard) InsertVariationToDb(variationUUID string) error {
+func (card *MTGCard) InsertVariationToDb(variationUUID string, lock *sync.RWMutex) error {
+	lock.RLock()
 	res, err := insertVariationQuery.Exec(card.UUID, variationUUID)
+	lock.RUnlock()
 	if err != nil {
 		return err
 	}
@@ -441,7 +476,7 @@ func (card *MTGCard) InsertVariationToDb(variationUUID string) error {
 	return checkRowsAffected(res, 1, "insert variation")
 }
 
-func (card *MTGCard) InsertCardToDb(atomicPropertiesId int64) error {
+func (card *MTGCard) InsertCardToDb(atomicPropertiesId int64, lock *sync.RWMutex) error {
 	var duelDeck sql.NullString
 	var flavorText sql.NullString
 	var mtgArenaId sql.NullInt32
@@ -481,6 +516,7 @@ func (card *MTGCard) InsertCardToDb(atomicPropertiesId int64) error {
 
 	cardHash := HashToHexString(card.Hash())
 
+	lock.RLock()
 	res, err := insertCardQuery.Exec(card.UUID, cardHash, atomicPropertiesId,
 		card.Artist, card.BorderColor, card.Number, card.ScryfallId,
 		card.Watermark, card.FrameVersion, card.MCMId, card.MCMMetaId,
@@ -491,6 +527,7 @@ func (card *MTGCard) InsertCardToDb(atomicPropertiesId int64) error {
 		card.IsPaper, card.IsPromo, card.IsReprint, card.IsStarter,
 		card.IsStorySpotlight, card.IsTextless, card.IsTimeshifted,
 		mtgArenaId, mtgoFoilId, mtgoId, scryfallIllustrationId)
+	lock.RUnlock()
 
 	if err != nil {
 		return err
@@ -499,7 +536,8 @@ func (card *MTGCard) InsertCardToDb(atomicPropertiesId int64) error {
 	return checkRowsAffected(res, 1, "insert card data")
 }
 
-func (card *MTGCard) InsertAtomicPropertiesToDb(atomicPropertiesHash string) (int64, error) {
+func (card *MTGCard) InsertAtomicPropertiesToDb(atomicPropertiesHash string,
+		lock *sync.RWMutex) (int64, error) {
 	// Build the set values needed for color_identity, color_indicator, and colors
 	var colorIdentity sql.NullString
 	var colorIndicator sql.NullString
@@ -556,6 +594,7 @@ func (card *MTGCard) InsertAtomicPropertiesToDb(atomicPropertiesHash string) (in
 		side.Valid = true
 	}
 
+	lock.RLock()
 	res, err := insertAtomicPropertiesQuery.Exec(atomicPropertiesHash,
 		colorIdentity,
 		colorIndicator,
@@ -577,6 +616,7 @@ func (card *MTGCard) InsertAtomicPropertiesToDb(atomicPropertiesHash string) (in
 		card.Text,
 		card.Toughness,
 		card.Type)
+	lock.RUnlock()
 
 	if err != nil {
 		return 0, err
@@ -757,14 +797,17 @@ func GetLeadershipFormats(db *sql.DB) (map[string]int, error) {
 	return leadershipFormats, nil
 }
 
-func GetAtomicPropertiesId(atomicPropertiesHash string, card *MTGCard) (int64, bool, error) {
+func GetAtomicPropertiesId(atomicPropertiesHash string, card *MTGCard,
+		lock *sync.RWMutex) (int64, bool, error) {
 	// First, check how many entries are already in the db with this card hash
 	// If it's 0, this atomic data isn't in the db, so we can return without getting the id
 	// If it's 1, we can just return the retrieved ID
 	// If it's more than 1, we have a hash collision, so we use the scryfall_oracle_id to disambiguate
 
 	var count int
+	lock.Lock()
 	countResult := numAtomicPropertiesQuery.QueryRow(atomicPropertiesHash)
+	lock.Unlock()
 	if err := countResult.Scan(&count); err != nil {
 		return 0, false, err
 	}
@@ -778,13 +821,17 @@ func GetAtomicPropertiesId(atomicPropertiesHash string, card *MTGCard) (int64, b
 	var scryfallOracleId string
 	if count == 1 {
 		// Only need to query the Id
+		lock.Lock()
 		idResult := atomicPropertiesIdQuery.QueryRow(atomicPropertiesHash)
+		lock.Unlock()
 		if err := idResult.Scan(&atomicPropertiesId, &scryfallOracleId); err != nil {
 			return 0, false, err
 		}
 		return atomicPropertiesId, true, nil
 	} else {
 		// Hash collision, so need to iterate and check the scryfall_oracle_id
+		lock.Lock()
+		defer lock.Unlock()
 		results, err := atomicPropertiesIdQuery.Query(atomicPropertiesHash)
 		if err != nil {
 			return 0, false, err
