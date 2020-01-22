@@ -29,6 +29,7 @@ CREATE TABLE mtg_cards.all_cards (
 	uuid CHAR(36) NOT NULL PRIMARY KEY,
 	full_card_hash CHAR(32) NOT NULL,
 	atomic_card_data_id INT NOT NULL,
+	set_id INT NOT NULL,
 	artist VARCHAR(100) NOT NULL COLLATE utf8mb4_general_ci, #Max existing len: 54
 	border_color VARCHAR(30) NOT NULL COLLATE utf8mb4_general_ci, #Max existing len: 10
 	card_number VARCHAR(20) NOT NULL COLLATE utf8mb4_general_ci, #Max existing len: 9
@@ -65,10 +66,23 @@ CREATE TABLE mtg_cards.all_cards (
 	scryfall_illustration_id CHAR(36) NULL
 ) DEFAULT COLLATE utf8mb4_bin;
 
+CREATE TABLE mtg_cards.frame_effect_options (
+	frame_effect_option_id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+	frame_effect_option VARCHAR(50) NOT NULL COLLATE utf8mb4_general_ci #Max existing len: 22
+) DEFAULT COLLATE utf8mb4_bin;
+
+INSERT INTO mtg_cards.frame_effect_options
+(frame_effect_option)
+VALUES
+("legendary"), ("nyxtouched"), ("sunmoondfc"), ("extendedart"), ("devoid"),
+("tombstone"), ("compasslanddfc"), ("showcase"), ("colorshifted"), ("originpwdfc"),
+("mooneldrazidfc"), ("inverted"), ("draft"), ("miracle"), ("nyxborn"),
+("waxingandwaningmoondfc");
+
 CREATE TABLE mtg_cards.frame_effects (
 	frame_effect_id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
 	card_uuid CHAR(36) NOT NULL,
-	frame_effect VARCHAR(50) NOT NULL COLLATE utf8mb4_general_ci #Max existing len: 22
+	frame_effect_option_id INT NOT NULL
 ) DEFAULT COLLATE utf8mb4_bin;
 
 CREATE TABLE mtg_cards.variations (
