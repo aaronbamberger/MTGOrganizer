@@ -23,7 +23,7 @@ type MTGSet struct {
 	ReleaseDate string `json:"releaseDate"`
 	TCGPlayerGroupId int `json:"tcgplayerGroupId"`
 	TotalSetSize int `json:"totalSetSize"`
-	Translations MTGSetNameTranslations `json:"translations"`
+	Translations map[string]string `json:"translations"`
 	Type string `json:"type"`
 	hash hash.Hash
 	hashValid bool
@@ -53,9 +53,18 @@ func (set *MTGSet) Hash() hash.Hash {
 		set.hash.Write([]byte(set.ReleaseDate))
 		binary.Write(set.hash, binary.BigEndian, set.TCGPlayerGroupId)
 		binary.Write(set.hash, binary.BigEndian, set.TotalSetSize)
-		translationsHash := set.Translations.Hash()
-		translationsHashBytes := make([]byte, 0, translationsHash.Size())
-		set.hash.Write(translationsHash.Sum(translationsHashBytes))
+		// Since go maps don't have a defined iteration order,
+		// Ensure a repeatable hash by sorting the keyset, and using
+		// that to define the iteration order
+		translationLangs := make([]string, 0, len(set.Translations))
+		for lang, _ := range set.Translations {
+			translationLangs = append(translationLangs, lang)
+		}
+		sort.Strings(translationLangs)
+		for _, lang := range translationLangs {
+			set.hash.Write([]byte(lang))
+			set.hash.Write([]byte(set.Translations[lang]))
+		}
 		set.hash.Write([]byte(set.Type))
 		set.hashValid = true
 	}

@@ -3,7 +3,7 @@ package mtgcards
 import "fmt"
 import "unicode"
 
-func DevlopmentStats(sets map[string]MTGSet) {
+func DevelopmentStats(sets map[string]MTGSet) {
 	/*
 	numCards := 0
 	fmt.Printf("Number of sets retrieved: %d\n", len(allSets))
@@ -59,6 +59,7 @@ func DevlopmentStats(sets map[string]MTGSet) {
 	maxSetMTGOCodeLen := 0
 	maxSetNameLen := 0
 	maxSetParentCodeLen := 0
+	maxSetTranslationLangLen := 0
 	maxSetTranslatedNameLen := 0
 	maxSetTypeLen := 0
 
@@ -83,6 +84,7 @@ func DevlopmentStats(sets map[string]MTGSet) {
 	maxOriginalTextLen := 0
 	maxOriginalTypeLen := 0
 	maxPowerLen := 0
+	maxPurchaseSiteLen := 0
 	maxPurchaseUrlLen := 0
 	maxRarityLen := 0
 	maxRulingTextLen := 0
@@ -94,6 +96,7 @@ func DevlopmentStats(sets map[string]MTGSet) {
 	maxTypeLen := 0
 	maxWatermarkLen := 0
 	nonAsciiNameCharsMap := make(map[rune]int)
+	baseTypes := make([]string, 0)
 
 	for _, set := range sets {
 		if len(set.Block) > maxSetBlockNameLen {
@@ -117,35 +120,13 @@ func DevlopmentStats(sets map[string]MTGSet) {
 		if len(set.ParentCode) > maxSetParentCodeLen {
 			maxSetParentCodeLen = len(set.ParentCode)
 		}
-		if len(set.Translations.ChineseSimplified) > maxSetTranslatedNameLen {
-			maxSetTranslatedNameLen = len(set.Translations.ChineseSimplified)
-		}
-		if len(set.Translations.ChineseTraditional) > maxSetTranslatedNameLen {
-			maxSetTranslatedNameLen = len(set.Translations.ChineseTraditional)
-		}
-		if len(set.Translations.French) > maxSetTranslatedNameLen {
-			maxSetTranslatedNameLen = len(set.Translations.French)
-		}
-		if len(set.Translations.German) > maxSetTranslatedNameLen {
-			maxSetTranslatedNameLen = len(set.Translations.German)
-		}
-		if len(set.Translations.Italian) > maxSetTranslatedNameLen {
-			maxSetTranslatedNameLen = len(set.Translations.Italian)
-		}
-		if len(set.Translations.Japanese) > maxSetTranslatedNameLen {
-			maxSetTranslatedNameLen = len(set.Translations.Japanese)
-		}
-		if len(set.Translations.Korean) > maxSetTranslatedNameLen {
-			maxSetTranslatedNameLen = len(set.Translations.Korean)
-		}
-		if len(set.Translations.PortugeseBrazil) > maxSetTranslatedNameLen {
-			maxSetTranslatedNameLen = len(set.Translations.PortugeseBrazil)
-		}
-		if len(set.Translations.Russian) > maxSetTranslatedNameLen {
-			maxSetTranslatedNameLen = len(set.Translations.Russian)
-		}
-		if len(set.Translations.Spanish) > maxSetTranslatedNameLen {
-			maxSetTranslatedNameLen = len(set.Translations.Spanish)
+		for lang, name := range set.Translations {
+			if len(lang) > maxSetTranslationLangLen {
+				maxSetTranslationLangLen = len(lang)
+			}
+			if len(name) > maxSetTranslatedNameLen {
+				maxSetTranslatedNameLen = len(name)
+			}
 		}
 		if len(set.Type) > maxSetTypeLen {
 			maxSetTypeLen = len(set.Type)
@@ -230,14 +211,13 @@ func DevlopmentStats(sets map[string]MTGSet) {
 			if len(card.Power) > maxPowerLen {
 				maxPowerLen = len(card.Power)
 			}
-			if len(card.PurchaseURLs.Cardmarket) >= maxPurchaseUrlLen {
-				maxPurchaseUrlLen = len(card.PurchaseURLs.Cardmarket)
-			}
-			if len(card.PurchaseURLs.TCGPlayer) >= maxPurchaseUrlLen {
-				maxPurchaseUrlLen = len(card.PurchaseURLs.TCGPlayer)
-			}
-			if len(card.PurchaseURLs.MTGStocks) >= maxPurchaseUrlLen {
-				maxPurchaseUrlLen = len(card.PurchaseURLs.MTGStocks)
+			for site, url := range card.PurchaseURLs {
+				if len(site) > maxPurchaseSiteLen {
+					maxPurchaseSiteLen = len(site)
+				}
+				if len(url) > maxPurchaseUrlLen {
+					maxPurchaseUrlLen = len(url)
+				}
 			}
 			if len(card.Rarity) > maxRarityLen {
 				maxRarityLen = len(card.Rarity)
@@ -272,6 +252,35 @@ func DevlopmentStats(sets map[string]MTGSet) {
 			if len(card.Watermark) > maxWatermarkLen {
 				maxWatermarkLen = len(card.Watermark)
 			}
+
+			for _, cardType := range card.Types {
+				var inSubtype, inSupertype bool
+				for _, subtype := range card.Subtypes {
+					if subtype == cardType {
+						inSubtype = true
+						break
+					}
+				}
+				for _, supertype := range card.Supertypes {
+					if supertype == cardType {
+						inSupertype = true
+						break
+					}
+				}
+				if !inSubtype && !inSupertype {
+					inBasetypes := false
+					for _, baseType := range baseTypes {
+						if cardType == baseType {
+							inBasetypes = true
+							break
+						}
+					}
+
+					if !inBasetypes {
+						baseTypes = append(baseTypes, cardType)
+					}
+				}
+			}
 		}
 	}
 
@@ -282,6 +291,7 @@ func DevlopmentStats(sets map[string]MTGSet) {
 	fmt.Printf("Max set mtgo code len: %d\n", maxSetMTGOCodeLen)
 	fmt.Printf("Max set name len: %d\n", maxSetNameLen)
 	fmt.Printf("Max set parent code len: %d\n", maxSetParentCodeLen)
+	fmt.Printf("Max set translation lang len: %d\n", maxSetTranslationLangLen)
 	fmt.Printf("Max set translated name len: %d\n", maxSetTranslatedNameLen)
 	fmt.Printf("Max set type len: %d\n", maxSetTypeLen)
 
@@ -306,6 +316,7 @@ func DevlopmentStats(sets map[string]MTGSet) {
 	fmt.Printf("Max original text len: %d\n", maxOriginalTextLen)
 	fmt.Printf("Max original type len: %d\n", maxOriginalTypeLen)
 	fmt.Printf("Max power len: %d\n", maxPowerLen)
+	fmt.Printf("Max purchase site len: %d\n", maxPurchaseSiteLen)
 	fmt.Printf("Max purchase url len: %d\n", maxPurchaseUrlLen)
 	fmt.Printf("Max rarity len: %d\n", maxRarityLen)
 	fmt.Printf("Max ruling text len: %d\n", maxRulingTextLen)
@@ -320,6 +331,11 @@ func DevlopmentStats(sets map[string]MTGSet) {
 	fmt.Printf("Non ASCII characters appearing in card names:\n")
 	for character, occurences := range nonAsciiNameCharsMap {
 		fmt.Printf("\t%c (%d): %d\n", character, character, occurences)
+	}
+
+	fmt.Printf("Card base types:\n")
+	for _, baseType := range baseTypes {
+		fmt.Printf("\t%s\n", baseType)
 	}
 
 	/*

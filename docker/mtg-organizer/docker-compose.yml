@@ -2,6 +2,7 @@ version: '3'
 services:
     card_db:
         image: "mariadb:latest"
+        command: --max-connections 1000
         volumes:
             - /bagner_data/Projects/MTGOrganizer/db:/var/lib/mysql
         environment:

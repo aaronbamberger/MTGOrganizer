@@ -62,7 +62,7 @@ type MTGCard struct {
 	Legalities map[string]string `json:"legalities"`
 	MTGStocksId int `"mtgstocksId"`
 	Printings []string `json:"printings"`
-	PurchaseURLs MTGCardPurchaseURLs `json:"purchaseUrls"`
+	PurchaseURLs map[string]string `json:"purchaseUrls"`
 	Rulings []MTGCardRuling `json:"rulings"`
 
 	// Optional
@@ -193,9 +193,20 @@ func (card *MTGCard) AtomicPropertiesHash() hash.Hash {
 		for _, printing := range card.Printings {
 			card.atomicPropertiesHash.Write([]byte(printing))
 		}
-		purchaseURLsHash := card.PurchaseURLs.Hash()
-		purchaseURLsHashBytes := make([]byte, 0, purchaseURLsHash.Size())
-		card.atomicPropertiesHash.Write(purchaseURLsHash.Sum(purchaseURLsHashBytes))
+
+		// Since go maps don't have a defined iteration order,
+		// Ensure a repeatable hash by sorting the keyset, and using
+		// that to define the iteration order
+		purchaseSites := make([]string, 0, len(card.PurchaseURLs))
+		for site, _ := range card.PurchaseURLs {
+			purchaseSites = append(purchaseSites, site)
+		}
+		sort.Strings(purchaseSites)
+		for _, site := range purchaseSites {
+			card.atomicPropertiesHash.Write([]byte(site))
+			card.atomicPropertiesHash.Write([]byte(card.PurchaseURLs[site]))
+		}
+
 		for _, ruling := range card.Rulings {
 			rulingHash := ruling.Hash()
 			rulingHashBytes := make([]byte, 0, rulingHash.Size())

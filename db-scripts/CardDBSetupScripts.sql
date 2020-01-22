@@ -127,7 +127,8 @@ INSERT INTO mtg_cards.game_formats
 (game_format_name)
 VALUES
 ("brawl"), ("commander"), ("duel"), ("future"), ("frontier"), ("legacy"), ("modern"),
-("pauper"), ("penny"), ("pioneer"), ("standard"), ("vintage");
+("pauper"), ("penny"), ("pioneer"), ("standard"), ("vintage"), ("historic"),
+("oldschool");
 
 CREATE TABLE mtg_cards.legality_options (
 	legality_option_id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -138,6 +139,26 @@ INSERT INTO mtg_cards.legality_options
 (legality_option_name)
 VALUES
 ("Legal"), ("Not Legal"), ("Restricted"), ("Banned");
+
+CREATE TABLE mtg_cards.base_type_options (
+	base_type_option_id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+	base_type_option VARCHAR(50) NOT NULL COLLATE utf8mb4_general_ci
+) DEFAULT COLLATE utf8mb4_bin;
+
+INSERT INTO mtg_cards.base_type_options
+(base_type_option)
+VALUES
+("Creature"), ("Sorcery"), ("Instant"), ("Land"), ("Planeswalker"), ("Artifact"),
+("Enchantment"), ("Tribal"), ("Scheme"), ("Hero"), ("Eaturecray"), ("Summon"),
+("Plane"), ("Phenomenon"), ("Autobot"), ("Character"), ("Vanguard"), ("Conspiracy"),
+("Scariest"), ("You'll"), ("Ever"), ("See"), ("instant"), ("Wolf"), ("Elemental"),
+("Specter");
+
+CREATE TABLE mtg_cards.base_types (
+	base_type_id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+	atomic_card_data_id INT NOT NULL,
+	base_type_option_id INT NOT NULL
+) DEFAULT COLLATE utf8mb4_bin;
 
 CREATE TABLE mtg_cards.sets (
 	set_id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -169,7 +190,7 @@ CREATE TABLE mtg_cards.card_printings (
 
 CREATE TABLE mtg_cards.purchase_sites (
 	purchase_site_id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-	purchase_site_name VARCHAR(30) NOT NULL COLLATE utf8mb4_general_ci
+	purchase_site_name VARCHAR(30) NOT NULL COLLATE utf8mb4_general_ci #Max existing len: 10
 ) DEFAULT COLLATE utf8mb4_bin;
 
 INSERT INTO mtg_cards.purchase_sites
@@ -205,7 +226,7 @@ CREATE TABLE mtg_cards.card_supertypes (
 
 CREATE TABLE mtg_cards.set_translation_languages (
 	set_translation_language_id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-	set_translation_language VARCHAR(50) NOT NULL COLLATE utf8mb4_general_ci
+	set_translation_language VARCHAR(50) NOT NULL COLLATE utf8mb4_general_ci #Max existing len: 19
 ) DEFAULT COLLATE utf8mb4_bin;
 
 INSERT INTO mtg_cards.set_translation_languages
