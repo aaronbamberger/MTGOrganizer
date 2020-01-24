@@ -97,6 +97,8 @@ func DevelopmentStats(sets map[string]MTGSet) {
 	maxWatermarkLen := 0
 	nonAsciiNameCharsMap := make(map[rune]int)
 	baseTypes := make([]string, 0)
+	uniqueSubtypes := make(map[string]bool)
+	uniqueSupertypes := make(map[string]bool)
 
 	for _, set := range sets {
 		if len(set.Block) > maxSetBlockNameLen {
@@ -281,6 +283,18 @@ func DevelopmentStats(sets map[string]MTGSet) {
 					}
 				}
 			}
+
+			for _, subtype := range card.Subtypes {
+				if _, ok := uniqueSubtypes[subtype]; !ok {
+					uniqueSubtypes[subtype] = true
+				}
+			}
+
+			for _, supertype := range card.Supertypes {
+				if _, ok := uniqueSupertypes[supertype]; !ok {
+					uniqueSupertypes[supertype] = true
+				}
+			}
 		}
 	}
 
@@ -337,6 +351,28 @@ func DevelopmentStats(sets map[string]MTGSet) {
 	for _, baseType := range baseTypes {
 		fmt.Printf("\t%s\n", baseType)
 	}
+
+	// Dump the subtypes and supertypes in a format suitable for inserting
+	// into a sql database, so I don't have to type them all in manually
+	fmt.Printf("Subtypes:\n")
+	currentCount := 0
+	for subtype, _ := range uniqueSubtypes {
+		if currentCount % 5 == 0 {
+			fmt.Printf("\n")
+		}
+		fmt.Printf("(\"%s\"), ", subtype)
+		currentCount += 1
+	}
+	fmt.Printf("Supertypes:\n")
+	currentCount = 0
+	for supertype, _ := range uniqueSupertypes {
+		if currentCount % 5 == 0 {
+			fmt.Printf("\n")
+		}
+		fmt.Printf("(\"%s\"), ", supertype)
+		currentCount += 1
+	}
+
 
 	/*
 	colorIdentityMap := make(map[string]int)

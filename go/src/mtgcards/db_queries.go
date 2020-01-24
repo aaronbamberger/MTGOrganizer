@@ -9,13 +9,15 @@ import "log"
 import "strings"
 import "sync"
 
-var gameFormats sync.Map
-var legalityOptions sync.Map
-var purchaseSites sync.Map
-var leadershipFormats sync.Map
-var setTranslationLanguages sync.Map
-var baseTypeOptions sync.Map
-var frameEffectOptions sync.Map
+var gameFormatsCache sync.Map
+var legalityOptionsCache sync.Map
+var purchaseSitesCache sync.Map
+var leadershipFormatsCache sync.Map
+var setTranslationLanguagesCache sync.Map
+var baseTypeOptionsCache sync.Map
+var frameEffectOptionsCache sync.Map
+var subtypeOptionsCache sync.Map
+var supertypeOptionsCache sync.Map
 
 func checkRowsAffected(res sql.Result, expectedAffected int64, errString string) error {
 	rowsAffected, err := res.RowsAffected()
@@ -38,39 +40,110 @@ func HashToHexString(hashVal hash.Hash) string {
 }
 
 func populateCaches(db *sql.DB) error {
-	var err error
+	retrieveGameFormatsQuery, err := db.Prepare(`SELECT game_format_id, game_format_name
+		FROM game_formats`)
+	if err != nil {
+		return err
+	}
+	defer retrieveGameFormatsQuery.Close()
 
-	err = populateGameFormatsCache(db)
+	retrieveLegalityOptionsQuery, err := db.Prepare(`SELECT legality_option_id, legality_option_name
+		FROM legality_options`)
+	if err != nil {
+		return err
+	}
+	defer retrieveLegalityOptionsQuery.Close()
+
+	retrievePurchaseSitesQuery, err := db.Prepare(`SELECT purchase_site_id, purchase_site_name
+		FROM purchase_sites`)
+	if err != nil {
+		return err
+	}
+	defer retrievePurchaseSitesQuery.Close()
+
+	retrieveSetTranslationLanguagesQuery, err := db.Prepare(`SELECT set_translation_language_id,
+		set_translation_language FROM set_translation_languages`)
+	if err != nil {
+		return err
+	}
+	defer retrieveSetTranslationLanguagesQuery.Close()
+
+	retrieveBaseTypeOptionsQuery, err := db.Prepare(`SELECT base_type_option_id,
+		base_type_option FROM base_type_options`)
+	if err != nil {
+		return err
+	}
+	defer retrieveBaseTypeOptionsQuery.Close()
+
+	retrieveLeadershipFormatsQuery, err := db.Prepare(`SELECT leadership_format_id,
+		leadership_format_name FROM leadership_formats`)
+	if err != nil {
+		return err
+	}
+	defer retrieveLeadershipFormatsQuery.Close()
+
+	retrieveFrameEffectOptionsQuery, err := db.Prepare(`SELECT frame_effect_option_id,
+		frame_effect_option FROM frame_effect_options`)
+	if err != nil {
+		return err
+	}
+	defer retrieveFrameEffectOptionsQuery.Close()
+
+	retrieveSubtypeOptionsQuery, err := db.Prepare(`SELECT subtype_option_id,
+		subtype_option FROM card_subtype_options`)
+	if err != nil {
+		return err
+	}
+	defer retrieveSubtypeOptionsQuery.Close()
+
+	retrieveSupertypeOptionsQuery, err := db.Prepare(`SELECT supertype_option_id,
+		supertype_option FROM card_supertype_options`)
+	if err != nil {
+		return err
+	}
+	defer retrieveSupertypeOptionsQuery.Close()
+
+	err = populateOptionsCache(retrieveGameFormatsQuery, &gameFormatsCache)
 	if err != nil {
 		return err
 	}
 
-	err = populateLegalityOptionsCache(db)
+	err = populateOptionsCache(retrieveLegalityOptionsQuery, &legalityOptionsCache)
 	if err != nil {
 		return err
 	}
 
-	err = populatePurchaseSitesCache(db)
+	err = populateOptionsCache(retrievePurchaseSitesQuery, &purchaseSitesCache)
 	if err != nil {
 		return err
 	}
 
-	err = populateLeadershipFormatsCache(db)
+	err = populateOptionsCache(retrieveLeadershipFormatsQuery, &leadershipFormatsCache)
 	if err != nil {
 		return err
 	}
 
-	err = populateSetTranslationLanguagesCache(db)
+	err = populateOptionsCache(retrieveSetTranslationLanguagesQuery, &setTranslationLanguagesCache)
 	if err != nil {
 		return err
 	}
 
-	err = populateBaseTypeOptionsCache(db)
+	err = populateOptionsCache(retrieveBaseTypeOptionsQuery, &baseTypeOptionsCache)
 	if err != nil {
 		return err
 	}
 
-	err = populateFrameEffectOptionsCache(db)
+	err = populateOptionsCache(retrieveFrameEffectOptionsQuery, &frameEffectOptionsCache)
+	if err != nil {
+		return err
+	}
+
+	err = populateOptionsCache(retrieveSubtypeOptionsQuery, &subtypeOptionsCache)
+	if err != nil {
+		return err
+	}
+
+	err = populateOptionsCache(retrieveSupertypeOptionsQuery, &supertypeOptionsCache)
 	if err != nil {
 		return err
 	}
@@ -207,7 +280,7 @@ func maybeInsertSetToDb(db *sql.DB, wg *sync.WaitGroup, set MTGSet) {
 	defer insertCardPrintingQuery.Close()
 
 	insertCardSubtypeQuery, err := tx.Prepare(`INSERT INTO card_subtypes
-		(atomic_card_data_id, card_subtype)
+		(atomic_card_data_id, subtype_option_id)
 		VALUES
 		(?, ?)`)
 	if err != nil {
@@ -217,7 +290,7 @@ func maybeInsertSetToDb(db *sql.DB, wg *sync.WaitGroup, set MTGSet) {
 	defer insertCardSubtypeQuery.Close()
 
 	insertCardSupertypeQuery, err := tx.Prepare(`INSERT INTO card_supertypes
-		(atomic_card_data_id, card_supertype)
+		(atomic_card_data_id, supertype_option_id)
 		VALUES
 		(?, ?)`)
 	if err != nil {
@@ -378,6 +451,24 @@ func maybeInsertSetToDb(db *sql.DB, wg *sync.WaitGroup, set MTGSet) {
 		return
 	}
 
+	insertSubtypeOptionQuery, err := tx.Prepare(`INSERT INTO card_subtype_options
+		(subtype_option)
+		VALUES
+		(?)`)
+	if err != nil {
+		log.Print(err)
+		return
+	}
+
+	insertSupertypeOptionQuery, err := tx.Prepare(`INSERT INTO card_supertype_options
+		(supertype_option)
+		VALUES
+		(?)`)
+	if err != nil {
+		log.Print(err)
+		return
+	}
+
 	// Hash the set for later use
 	set.Canonicalize()
 	setHash := HashToHexString(set.Hash())
@@ -530,7 +621,8 @@ func maybeInsertSetToDb(db *sql.DB, wg *sync.WaitGroup, set MTGSet) {
 
 			// Subtypes
 			for _, subtype := range card.Subtypes {
-				err = InsertCardSubtypeToDb(insertCardSubtypeQuery, atomicPropId, subtype)
+				err = InsertCardSubtypeToDb(insertSubtypeOptionQuery, insertCardSubtypeQuery,
+					atomicPropId, subtype)
 				if err != nil {
 					log.Print(err)
 				}
@@ -538,7 +630,8 @@ func maybeInsertSetToDb(db *sql.DB, wg *sync.WaitGroup, set MTGSet) {
 
 			// Supertypes
 			for _, supertype := range card.Supertypes {
-				err = InsertCardSupertypeToDb(insertCardSupertypeQuery, atomicPropId, supertype)
+				err = InsertCardSupertypeToDb(insertSupertypeOptionQuery, insertCardSupertypeQuery,
+					atomicPropId, supertype)
 				if err != nil {
 					log.Print(err)
 				}
@@ -637,7 +730,7 @@ func InsertLeadershipSkillToDb(insertFormatQuery *sql.Stmt, insertSkillQuery *sq
 		atomicPropertiesId int64, leadershipFormat string, leaderLegal bool) error {
 	// Get the leadership format id from the cache
 	var leadershipFormatId int64
-	leadershipFormatIdTemp, loaded := leadershipFormats.Load(leadershipFormat)
+	leadershipFormatIdTemp, loaded := leadershipFormatsCache.Load(leadershipFormat)
 	if !loaded {
 		// This is the unlikely case where we have a new value that isn't pre-populated in the db
 		res, err := insertFormatQuery.Exec(leadershipFormat)
@@ -649,7 +742,7 @@ func InsertLeadershipSkillToDb(insertFormatQuery *sql.Stmt, insertSkillQuery *sq
 		if err != nil {
 			return err
 		}
-		leadershipFormats.Store(leadershipFormat, leadershipFormatId)
+		leadershipFormatsCache.Store(leadershipFormat, leadershipFormatId)
 	} else {
 		leadershipFormatId = leadershipFormatIdTemp.(int64)
 	}
@@ -667,7 +760,7 @@ func InsertLegalityToDb(insertFormatQuery *sql.Stmt, insertOptionQuery *sql.Stmt
 		legalityOption string) error {
 	// Get the game format id from the cache
 	var gameFormatId int64
-	gameFormatIdTemp, loaded := gameFormats.Load(gameFormat)
+	gameFormatIdTemp, loaded := gameFormatsCache.Load(gameFormat)
 	if !loaded {
 		// This is the unlikely case where we have a new value that isn't pre-populated in the db
 		res, err := insertFormatQuery.Exec(gameFormat)
@@ -679,14 +772,14 @@ func InsertLegalityToDb(insertFormatQuery *sql.Stmt, insertOptionQuery *sql.Stmt
 		if err != nil {
 			return err
 		}
-		gameFormats.Store(gameFormat, gameFormatId)
+		gameFormatsCache.Store(gameFormat, gameFormatId)
 	} else {
 		gameFormatId = gameFormatIdTemp.(int64)
 	}
 
 	// Get the legality option id from the cache
 	var legalityOptionId int64
-	legalityOptionIdTemp, loaded := legalityOptions.Load(legalityOption)
+	legalityOptionIdTemp, loaded := legalityOptionsCache.Load(legalityOption)
 	if !loaded {
 		// This is the unlikely case where we have a new value that isn't pre-populated in the db
 		res, err := insertOptionQuery.Exec(legalityOption)
@@ -698,7 +791,7 @@ func InsertLegalityToDb(insertFormatQuery *sql.Stmt, insertOptionQuery *sql.Stmt
 		if err != nil {
 			return err
 		}
-		legalityOptions.Store(legalityOption, legalityOptionId)
+		legalityOptionsCache.Store(legalityOption, legalityOptionId)
 	} else {
 		legalityOptionId = legalityOptionIdTemp.(int64)
 	}
@@ -724,7 +817,7 @@ func InsertPurchaseURLToDb(insertSiteQuery *sql.Stmt, insertUrlQuery *sql.Stmt,
 		atomicPropertiesId int64, purchaseSite string, purchaseURL string) error {
 	// Get the purchase site id from the cache
 	var purchaseSiteId int64
-	purchaseSiteIdTemp, loaded := purchaseSites.Load(purchaseSite)
+	purchaseSiteIdTemp, loaded := purchaseSitesCache.Load(purchaseSite)
 	if !loaded {
 		// This is the unlikely case where we have a new value that isn't pre-populated in the db
 		res, err := insertSiteQuery.Exec(purchaseSite)
@@ -736,7 +829,7 @@ func InsertPurchaseURLToDb(insertSiteQuery *sql.Stmt, insertUrlQuery *sql.Stmt,
 		if err != nil {
 			return err
 		}
-		purchaseSites.Store(purchaseSite, purchaseSiteId)
+		purchaseSitesCache.Store(purchaseSite, purchaseSiteId)
 	} else {
 		purchaseSiteId = purchaseSiteIdTemp.(int64)
 	}
@@ -753,7 +846,7 @@ func InsertSetTranslationToDb(insertLangQuery *sql.Stmt, insertTranslationQuery 
 		setId int64, translationLang string, translatedName string) error {
 	// Get the language id from the cache
 	var languageId int64
-	languageIdTemp, loaded := setTranslationLanguages.Load(translationLang)
+	languageIdTemp, loaded := setTranslationLanguagesCache.Load(translationLang)
 	if !loaded {
 		// This is the unlikely case where we have a new value that isn't pre-populated in the db
 		res, err := insertLangQuery.Exec(translationLang)
@@ -765,7 +858,7 @@ func InsertSetTranslationToDb(insertLangQuery *sql.Stmt, insertTranslationQuery 
 		if err != nil {
 			return err
 		}
-		setTranslationLanguages.Store(translationLang, languageId)
+		setTranslationLanguagesCache.Store(translationLang, languageId)
 	} else {
 		languageId = languageIdTemp.(int64)
 	}
@@ -780,60 +873,45 @@ func InsertSetTranslationToDb(insertLangQuery *sql.Stmt, insertTranslationQuery 
 
 func InsertBaseTypeToDb(insertBaseTypeOptionQuery *sql.Stmt, insertBaseTypeQuery *sql.Stmt,
 		atomicPropertiesId int64, baseTypeOption string) error {
-	// Get the base type id from the cache
-	var baseTypeOptionId int64
-	baseTypeOptionIdTemp, loaded := baseTypeOptions.Load(baseTypeOption)
-	if !loaded {
-		// This is the unlikely case where we have a new value that isn't pre-populated in the db
-		res, err := insertBaseTypeOptionQuery.Exec(baseTypeOption)
-		if err != nil {
-			return err
-		}
 
-		baseTypeOptionId, err = res.LastInsertId()
-		if err != nil {
-			return err
-		}
-		baseTypeOptions.Store(baseTypeOption, baseTypeOptionId)
-	} else {
-		baseTypeOptionId = baseTypeOptionIdTemp.(int64)
-	}
-
-	res, err := insertBaseTypeQuery.Exec(atomicPropertiesId, baseTypeOptionId)
-	if err != nil {
-		return err
-	}
-
-	return checkRowsAffected(res, 1, "insert base type")
+	return insertOptionToDb(insertBaseTypeOptionQuery, insertBaseTypeQuery,
+		&baseTypeOptionsCache, baseTypeOption, atomicPropertiesId)
 }
 
 func (card *MTGCard) InsertFrameEffectToDb(insertFrameEffectOptionQuery *sql.Stmt,
 		insertFrameEffectQuery *sql.Stmt, frameEffectOption string) error {
-	// Get the frame effect option id from the cache
-	var frameEffectOptionId int64
-	frameEffectOptionIdTemp, loaded := frameEffectOptions.Load(frameEffectOption)
+
+	return insertOptionToDb(insertFrameEffectOptionQuery, insertFrameEffectQuery,
+		&frameEffectOptionsCache, frameEffectOption, card.UUID)
+}
+
+func insertOptionToDb(insertOptionQuery *sql.Stmt, insertEntryQuery *sql.Stmt,
+		optionsCache *sync.Map, option string, cardId interface{}) error {
+	// Get the option id from the cache
+	var optionId int64
+	optionIdTemp, loaded := optionsCache.Load(option)
 	if !loaded {
 		// This is the unlikely case where we have a new value that isn't pre-populated in the db
-		res, err := insertFrameEffectOptionQuery.Exec(frameEffectOption)
+		res, err := insertOptionQuery.Exec(option)
 		if err != nil {
 			return err
 		}
 
-		frameEffectOptionId, err = res.LastInsertId()
+		optionId, err = res.LastInsertId()
 		if err != nil {
 			return err
 		}
-		frameEffectOptions.Store(frameEffectOption, frameEffectOptionId)
+		optionsCache.Store(option, optionId)
 	} else {
-		frameEffectOptionId = frameEffectOptionIdTemp.(int64)
+		optionId = optionIdTemp.(int64)
 	}
 
-	res, err := insertFrameEffectQuery.Exec(card.UUID, frameEffectOptionId)
+	res, err := insertEntryQuery.Exec(cardId, optionId)
 	if err != nil {
 		return err
 	}
 
-	return checkRowsAffected(res, 1, "insert frame effect")
+	return checkRowsAffected(res, 1, fmt.Sprintf("insert option %s", option))
 }
 
 func (altLangInfo *MTGCardAlternateLanguageInfo) InsertAltLangDataToDb(query *sql.Stmt,
@@ -857,22 +935,18 @@ func (ruling *MTGCardRuling) InsertRulingToDb(query *sql.Stmt, atomicPropertiesI
 	return checkRowsAffected(res, 1, "insert ruling")
 }
 
-func InsertCardSubtypeToDb(query *sql.Stmt, atomicPropertiesId int64, subtype string) error {
-	res, err := query.Exec(atomicPropertiesId, subtype)
-	if err != nil {
-		return err
-	}
+func InsertCardSubtypeToDb(insertSubtypeOptionQuery *sql.Stmt, insertSubtypeQuery *sql.Stmt,
+		atomicPropertiesId int64, subtype string) error {
 
-	return checkRowsAffected(res, 1, "insert subtype")
+	return insertOptionToDb(insertSubtypeOptionQuery, insertSubtypeQuery,
+		&subtypeOptionsCache, subtype, atomicPropertiesId)
 }
 
-func InsertCardSupertypeToDb(query *sql.Stmt, atomicPropertiesId int64, supertype string) error {
-	res, err := query.Exec(atomicPropertiesId, supertype)
-	if err != nil {
-		return err
-	}
+func InsertCardSupertypeToDb(insertSupertypeOptionQuery *sql.Stmt, insertSupertypeQuery *sql.Stmt,
+		atomicPropertiesId int64, supertype string) error {
 
-	return checkRowsAffected(res, 1, "insert supertype")
+	return insertOptionToDb(insertSupertypeOptionQuery, insertSupertypeQuery,
+		&supertypeOptionsCache, supertype, atomicPropertiesId)
 }
 
 func (card *MTGCard) InsertOtherFaceIdToDb(query *sql.Stmt, otherFaceUUID string) error {
@@ -1049,212 +1123,25 @@ func (card *MTGCard) InsertAtomicPropertiesToDb(query *sql.Stmt,
 	return lastInsertId, nil
 }
 
-func populateGameFormatsCache(db *sql.DB) error {
-	retrieveGameFormatsQuery, err := db.Prepare(`SELECT game_format_id, game_format_name
-		FROM game_formats`)
-	defer retrieveGameFormatsQuery.Close()
-	if err != nil {
-		return err
-	}
-
-	gameFormatRows, err := retrieveGameFormatsQuery.Query()
-	if err != nil {
-		return err
-	}
-	defer gameFormatRows.Close()
-
-	for gameFormatRows.Next() {
-		if err := gameFormatRows.Err(); err != nil {
-			return err
-		}
-
-		var gameFormatId int64
-		var gameFormatName string
-		err := gameFormatRows.Scan(&gameFormatId, &gameFormatName)
-		if err != nil {
-			return err
-		}
-		gameFormats.Store(gameFormatName, gameFormatId)
-	}
-
-	return nil
-}
-
-func populateLegalityOptionsCache(db *sql.DB) error {
-	retrieveLegalityOptionsQuery, err := db.Prepare(`SELECT legality_option_id, legality_option_name
-		FROM legality_options`)
-	defer retrieveLegalityOptionsQuery.Close()
-	if err != nil {
-		return err
-	}
-
-	legalityOptionsRows, err := retrieveLegalityOptionsQuery.Query()
-	if err != nil {
-		return err
-	}
-	defer legalityOptionsRows.Close()
-
-	for legalityOptionsRows.Next() {
-		if err := legalityOptionsRows.Err(); err != nil {
-			return err
-		}
-
-		var legalityOptionId int64
-		var legalityOptionName string
-		err := legalityOptionsRows.Scan(&legalityOptionId, &legalityOptionName)
-		if err != nil {
-			return err
-		}
-		legalityOptions.Store(legalityOptionName, legalityOptionId)
-	}
-
-	return nil
-}
-
-func populatePurchaseSitesCache(db *sql.DB) error {
-	retrievePurchaseSitesQuery, err := db.Prepare(`SELECT purchase_site_id, purchase_site_name
-		FROM purchase_sites`)
-	defer retrievePurchaseSitesQuery.Close()
-	if err != nil {
-		return err
-	}
-
-	purchaseSitesRows, err := retrievePurchaseSitesQuery.Query()
-	if err != nil {
-		return err
-	}
-	defer purchaseSitesRows.Close()
-
-	for purchaseSitesRows.Next() {
-		if err := purchaseSitesRows.Err(); err != nil {
-			return err
-		}
-
-		var purchaseSiteId int64
-		var purchaseSiteName string
-		err := purchaseSitesRows.Scan(&purchaseSiteId, &purchaseSiteName)
-		if err != nil {
-			return err
-		}
-		purchaseSites.Store(purchaseSiteName, purchaseSiteId)
-	}
-
-	return nil
-}
-
-func populateSetTranslationLanguagesCache(db *sql.DB) error {
-	retrieveSetTranslationLanguagesQuery, err := db.Prepare(`SELECT set_translation_language_id,
-		set_translation_language FROM set_translation_languages`)
-	defer retrieveSetTranslationLanguagesQuery.Close()
-	if err != nil {
-		return err
-	}
-
-	setTranslationLanguagesRows, err := retrieveSetTranslationLanguagesQuery.Query()
-	if err != nil {
-		return err
-	}
-	defer setTranslationLanguagesRows.Close()
-
-	for setTranslationLanguagesRows.Next() {
-		if err := setTranslationLanguagesRows.Err(); err != nil {
-			return err
-		}
-
-		var setTranslationLanguageId int64
-		var setTranslationLanguage string
-		err := setTranslationLanguagesRows.Scan(&setTranslationLanguageId, &setTranslationLanguage)
-		if err != nil {
-			return err
-		}
-		setTranslationLanguages.Store(setTranslationLanguage, setTranslationLanguageId)
-	}
-
-	return nil
-}
-
-func populateBaseTypeOptionsCache(db *sql.DB) error {
-	retrieveBaseTypeOptionsQuery, err := db.Prepare(`SELECT base_type_option_id,
-		base_type_option FROM base_type_options`)
-	defer retrieveBaseTypeOptionsQuery.Close()
-	if err != nil {
-		return err
-	}
-
-	baseTypeOptionsRows, err := retrieveBaseTypeOptionsQuery.Query()
-	if err != nil {
-		return err
-	}
-	defer baseTypeOptionsRows.Close()
-
-	for baseTypeOptionsRows.Next() {
-		if err := baseTypeOptionsRows.Err(); err != nil {
-			return err
-		}
-
-		var baseTypeOptionId int64
-		var baseTypeOption string
-		err := baseTypeOptionsRows.Scan(&baseTypeOptionId, &baseTypeOption)
-		if err != nil {
-			return err
-		}
-		baseTypeOptions.Store(baseTypeOption, baseTypeOptionId)
-	}
-
-	return nil
-}
-
-func populateLeadershipFormatsCache(db *sql.DB) error {
-	retrieveLeadershipFormatsQuery, err := db.Prepare(`SELECT leadership_format_id,
-		leadership_format_name FROM leadership_formats`)
-	defer retrieveLeadershipFormatsQuery.Close()
-
-	leadershipFormatsRows, err := retrieveLeadershipFormatsQuery.Query()
+func populateOptionsCache(getOptionsQuery *sql.Stmt, optionsCache *sync.Map) error {
+	optionsRows, err := getOptionsQuery.Query()
 	if err != nil {
 		return  err
 	}
-	defer leadershipFormatsRows.Close()
+	defer optionsRows.Close()
 
-	for leadershipFormatsRows.Next() {
-		if err := leadershipFormatsRows.Err(); err != nil {
+	for optionsRows.Next() {
+		if err := optionsRows.Err(); err != nil {
 			return err
 		}
 
-		var leadershipFormatId int64
-		var leadershipFormatName string
-		err := leadershipFormatsRows.Scan(&leadershipFormatId, &leadershipFormatName)
+		var optionId int64
+		var option string
+		err := optionsRows.Scan(&optionId, &option)
 		if err != nil {
 			return err
 		}
-		leadershipFormats.Store(leadershipFormatName, leadershipFormatId)
-	}
-
-	return nil
-}
-
-func populateFrameEffectOptionsCache(db *sql.DB) error {
-	retrieveFrameEffectOptionsQuery, err := db.Prepare(`SELECT frame_effect_option_id,
-		frame_effect_option FROM frame_effect_options`)
-	defer retrieveFrameEffectOptionsQuery.Close()
-
-	frameEffectOptionsRows, err := retrieveFrameEffectOptionsQuery.Query()
-	if err != nil {
-		return  err
-	}
-	defer frameEffectOptionsRows.Close()
-
-	for frameEffectOptionsRows.Next() {
-		if err := frameEffectOptionsRows.Err(); err != nil {
-			return err
-		}
-
-		var frameEffectOptionId int64
-		var frameEffectOption string
-		err := frameEffectOptionsRows.Scan(&frameEffectOptionId, &frameEffectOption)
-		if err != nil {
-			return err
-		}
-		frameEffectOptions.Store(frameEffectOption, frameEffectOptionId)
+		optionsCache.Store(option, optionId)
 	}
 
 	return nil

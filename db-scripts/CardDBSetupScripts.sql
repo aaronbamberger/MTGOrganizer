@@ -226,16 +226,99 @@ CREATE TABLE mtg_cards.rulings (
 	ruling_text VARCHAR(3000) NOT NULL COLLATE utf8mb4_general_ci #Max existing len: 1513
 ) DEFAULT COLLATE utf8mb4_bin;
 
+CREATE TABLE mtg_cards.card_subtype_options (
+	subtype_option_id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+	subtype_option VARCHAR(50) NOT NULL COLLATE utf8mb4_general_ci #Max existing len: 26
+) DEFAULT COLLATE utf8mb4_bin;
+
+INSERT INTO mtg_cards.card_subtype_options
+(subtype_option)
+VALUES
+("Mammoth"), ("Beast"), ("Domri"), ("Wraith"), ("Gorgon"), ("Kinshala"), ("Licid"),
+("Kangaroo"), ("Devil"), ("Monger"), ("Arkhos"), ("Brushwagg"), ("Igpay"), ("Hero"),
+("Head"), ("Human"), ("Rhino"), ("Warrior"), ("Tezzeret"), ("Samurai"), ("Angrath"),
+("Spawn"), ("Xenagos"), ("Construct"), ("Soldier"), ("Centaur"), ("Horse"), ("Food"),
+("Kithkin"), ("Dack"), ("Wrestler"), ("Paratrooper"), ("Fire"), ("Juggernaut"),
+("Antelope"), ("Pirate"), ("Ral"), ("Nastiest,"), ("Brainiac"), ("Davriel"),
+("Illusion"), ("Cockatrice"), ("Curse"), ("Hound"), ("Ape"), ("Vraska"),
+("Valla"), ("Vampire"), ("Ooze"), ("Demon"), ("Pegasus"), ("Clamfolk"), ("Forest"),
+("Shade"), ("Slith"), ("Rigger"), ("Ir"), ("Koth"), ("Specter"), ("Oko"),
+("Tamiyo"), ("Chicken"), ("Sphinx"), ("Phelddagrif"), ("Orgg"), ("Alicorn"),
+("Reflection"), ("Spider"), ("Archon"), ("Djinn"), ("God"), ("Drone"), ("Tibalt"),
+("Vampyre"), ("Freyalise"), ("Equipment"), ("Boar"), ("Monk"), ("Basilisk"),
+("Aetherborn"), ("Azra"), ("Regatha"), ("Processor"), ("Dungeon"), ("Jellyfish"),
+("Adventure"), ("Mercenary"), ("Daretti"), ("Skeleton"), ("Garruk"), ("Bolas"),
+("Sponge"), ("Donkey"), ("Mime"), ("Elemental"), ("Ogre"), ("Viashino"),
+("Nightstalker"), ("Bear"), ("Lamia"), ("Angel"), ("Whale"), ("Ugin"), ("Hatificer"),
+("Homunculus"), ("Scout"), ("Dog"), ("Drake"), ("Orc"), ("Noggle"), ("Moag"),
+("Power-Plant"), ("Gamer"), ("Citizen"), ("Tower"), ("Crocodile"), ("Giant"),
+("Trap"), ("Luvion"), ("Muraganda"), ("Nephilim"), ("Cephalid"), ("The"),
+("Designer"), ("Duck"), ("Equilor"), ("Deer"), ("Avatar"), ("Manticore"),
+("Townsfolk"), ("Horror"), ("Treefolk"), ("Windgrace"), ("Rath"), ("of"), ("Swamp"),
+("Berserker"), ("Wolf"), ("Yeti"), ("Squid"), ("Goat"), ("Teyo"), ("Iquatana"),
+("Lizard"), ("Will"), ("Myr"), ("Lhurgoyf"), ("Nomad"), ("Cartouche"), ("Zendikar"),
+("Ulgrotha"), ("Wombat"), ("Spy"), ("Monkey"), ("Starfish"), ("Kephalai"),
+("Shrine"), ("Cloud"), ("Bat"), ("Mutant"), ("Elspeth"), ("Kamigawa"), ("Karsus"),
+("Shandalar"),("Druid"), ("Dinosaur"), ("Crab"), ("Scarecrow"), ("Elk"), ("Chimera"),
+("Mongoose"), ("Sable"), ("Lobster"), ("Surrakar"), ("Desert"), ("Nautilus"),
+("Dominaria"), ("Gideon"), ("Mirrodin"), ("Dreadnought"), ("Homarid"), ("Kavu"),
+("Pangolin"), ("Saga"), ("Rebel"), ("Oyster"), ("Lammasu"), ("Gate"), ("Vehicle"),
+("Kor"), ("Estrid"), ("Trilobite"), ("Ravnica"), ("Wildfire"), ("Imp"),
+("Flagbearer"), ("Beeble"), ("Elves"), ("Lady"), ("Rogue"), ("Rowan"), ("Lair"),
+("Child"), ("Fish"), ("Ajani"), ("Chandra"), ("Kirin"), ("Bringer"), ("Zombie"),
+("Spirit"), ("Faerie"), ("Teferi"), ("Urza"), ("Elder"), ("Wrenn"), ("Jaya"),
+("Cyborg"), ("Elemental?"), ("Abian"), ("Dragon"), ("Vedalken"), ("Wurm"),
+("Unicorn"), ("Ally"), ("Penguin"), ("Liliana"), ("Ouphe"), ("Aurochs"), ("Fabacin"),
+("Mode"), ("Goblin"), ("Soltari"), ("Hag"), ("Octopus"), ("Worm"), ("Saheeli"),
+("Locus"), ("Master"), ("Rat"), ("Artificer"), ("Assembly-Worker"), ("Praetor"),
+("Samut"), ("Biggest,"), ("Kasmina"), ("Spike"), ("Shaman"), ("Turtle"),
+("Incarnation"), ("Eldrazi"), ("Gremlin"), ("Hyena"), ("Hippo"),
+("Bolas’s Meditation Realm"), ("Rabbit"), ("Kobold"), ("and/or"), ("Advisor"),
+("Elephant"), ("Kiora"), ("Hellion"), ("Carrier"), ("Rabiah"), ("Vryn"), ("Thrull"),
+("Wolverine"), ("Camel"), ("Aminatou"), ("Yanling"), ("Wizard"), ("Insect"),
+("Spellshaper"), ("Atog"), ("Segovia"), ("Demigod"), ("Beaver"), ("Knight"),
+("Elf"), ("Arlinn"), ("Arcane"), ("Pyrulea"), ("Mongseng"), ("Shadowmoor"),
+("Bureaucrat"), ("Werewolf"), ("Harpy"), ("Sheep"), ("Kaya"), ("Kolbahan"),
+("Phyrexia"), ("Autobot"), ("Gargoyle"), ("Phoenix"), ("Noble"), ("Siren"),
+("Naga"), ("Alien"), ("Griffin"), ("Nahiri"), ("Narset"), ("Calix"), ("Waiter"),
+("Island"), ("Cleric"), ("Jackal"), ("Serra’s Realm"), ("Leech"), ("Urza’s"),
+("Legend"), ("Frog"), ("Hydra"), ("Assassin"), ("Moonfolk"), ("Venser"), ("Killbot"),
+("Minotaur"), ("Azgol"), ("Ferret"), ("Sarkhan"), ("Shapeshifter"), ("Sorin"),
+("Barbarian"), ("Dovin"),("Lorwyn"), ("Ergamon"), ("Archer"), ("Nymph"),
+("Kaldheim"), ("Villain"), ("Zubera"), ("Fox"), ("Karn"), ("Xerex"), ("Etiquette"),
+("Yanggu"), ("Squirrel"), ("Mystic"), ("Scientist"), ("Gnome"), ("Serpent"),
+("Mole"), ("Nixilis"), ("Alara"), ("New Phyrexia"), ("Raccoon"), ("Key"),
+("Belenon"), ("Merfolk"), ("Ox"), ("Troll"), ("Peasant"), ("Plant"), ("Efreet"),
+("Serra"), ("Thalakos"), ("Jace"), ("Satyr"), ("Minion"), ("Kyneth"), ("Gus"),
+("Contraption"), ("Beholder"), ("Innistrad"), ("Golem"), ("Nightmare"),
+("Warlock"), ("Kraken"), ("Ninja"), ("Fortification"), ("Hippogriff"), ("Bot"),
+("Baddest,"), ("Plains"), ("Wall"), ("Fungus"), ("Eye"), ("Volver"), ("Cow"),
+("Ashiok"), ("Pest"), ("Leviathan"), ("Cat"), ("Sliver"), ("Salamander"), ("Weird"),
+("Dauthi"), ("Vivien"), ("Mummy"), ("Egg"), ("Dryad"), ("Slug"), ("Scorpion"),
+("Thopter"), ("Metathran"), ("Ship"), ("Masticore"), ("Inzerva"), ("Mercadia"),
+("Phyrexian"), ("Bird"), ("Mountain"), ("Snake"), ("Dwarf"), ("Badger"), ("Pilot"),
+("Aura"), ("Cyclops"), ("Nissa"), ("Huatli"), ("Mine"), ("Proper");
+
 CREATE TABLE mtg_cards.card_subtypes (
 	subtype_id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
 	atomic_card_data_id INT NOT NULL,
-	card_subtype VARCHAR(50) NOT NULL COLLATE utf8mb4_general_ci #Max existing len: 26
+	subtype_option_id INT NOT NULL
 ) DEFAULT COLLATE utf8mb4_bin;
+
+CREATE TABLE mtg_cards.card_supertype_options (
+	supertype_option_id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+	supertype_option VARCHAR(50) NOT NULL COLLATE utf8mb4_general_ci #Max existing len: 9
+) DEFAULT COLLATE utf8mb4_bin;
+
+INSERT INTO mtg_cards.card_supertype_options
+(supertype_option)
+VALUES
+("Legendary"), ("Basic"), ("Snow"), ("Ongoing"), ("World");
 
 CREATE TABLE mtg_cards.card_supertypes (
 	supertype_id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
 	atomic_card_data_id INT NOT NULL,
-	card_supertype VARCHAR(50) NOT NULL COLLATE utf8mb4_general_ci #Max existing len: 9
+	supertype_option_id INT NOT NULL
 ) DEFAULT COLLATE utf8mb4_bin;
 
 CREATE TABLE mtg_cards.set_translation_languages (
