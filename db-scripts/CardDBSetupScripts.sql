@@ -22,7 +22,8 @@ CREATE TABLE mtg_cards.atomic_card_data (
 	side CHAR(1) NULL,
 	text VARCHAR(1500) NOT NULL COLLATE utf8mb4_general_ci, #Max existing len: 770
 	toughness VARCHAR(10) NOT NULL COLLATE utf8mb4_general_ci, #Max existing len: 3
-	card_type VARCHAR(100) NOT NULL COLLATE utf8mb4_general_ci #Max existing len: 46
+	card_type VARCHAR(100) NOT NULL COLLATE utf8mb4_general_ci, #Max existing len: 46
+	INDEX name_index (name)
 ) DEFAULT COLLATE utf8mb4_bin;
 
 CREATE TABLE mtg_cards.all_cards (
@@ -63,7 +64,9 @@ CREATE TABLE mtg_cards.all_cards (
 	mtg_arena_id INT NULL,
 	mtgo_foil_id INT NULL,
 	mtgo_id INT NULL,
-	scryfall_illustration_id CHAR(36) NULL
+	scryfall_illustration_id CHAR(36) NULL,
+	INDEX card_hash_index (full_card_hash),
+	INDEX atomic_card_data_id_index (atomic_card_data_id)
 ) DEFAULT COLLATE utf8mb4_bin;
 
 CREATE TABLE mtg_cards.frame_effect_options (
@@ -193,7 +196,9 @@ CREATE TABLE mtg_cards.sets (
 	release_date DATE NOT NULL,
 	tcgplayer_group_id INT NOT NULL,
 	total_set_size INT NOT NULL,
-	set_type VARCHAR(50) NOT NULL COLLATE utf8mb4_general_ci #Max existing len: 16
+	set_type VARCHAR(50) NOT NULL COLLATE utf8mb4_general_ci, #Max existing len: 16
+	INDEX set_hash_index (set_hash),
+	UNIQUE INDEX code_index (code)
 ) DEFAULT COLLATE utf8mb4_bin;
 
 CREATE TABLE mtg_cards.card_printings (

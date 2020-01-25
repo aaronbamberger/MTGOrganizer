@@ -29,8 +29,25 @@ func HashToHexString(hashVal hash.Hash) string {
 	return hex.EncodeToString(hashBytes)
 }
 
-func ImportSetsToDb(db *sql.DB, sets map[string]MTGSet) error {
+type DbUpdateStats struct {
+	Mutex sync.Mutex
+	TotalSetsInUpdate int
+	TotalExistingSetsInDb int
+	TotalNewSets int
+	ExistingSetsSkippedDueToHashMatch int
+	ExistingSetsUpdatedDueToHashMismatch int
+	TotalCardsInUpdate int
+	TotalNewCards int
+	TotalNewAtomicCards int
+	TotalNewCardsInNewSets int
+	TotalNewCardsInExistingSets int
+	ExistingCardsSkippedDueToHashMatch int
+	ExistingCardsUpdatedDueToHashMismatch int
+}
+
+func ImportSetsToDb(db *sql.DB, sets map[string]MTGSet) (*DbUpdateStats, error) {
 	var setImportWg sync.WaitGroup
+	var updateStats DbUpdateStats
 
 	// We defer the cleanup before calling the setup function, because the setup
 	// function might get partway through the initialization, and then error out,
@@ -40,19 +57,247 @@ func ImportSetsToDb(db *sql.DB, sets map[string]MTGSet) error {
 	defer cleanupOptionTables()
 	err := prepareOptionTables(db)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	for _, set := range sets {
 		setImportWg.Add(1)
-		go maybeInsertSetToDb(db, &setImportWg, set)
+		go maybeInsertSetToDb(db, &updateStats, &setImportWg, set)
 	}
 
 	setImportWg.Wait()
+	return &updateStats, nil
+}
+
+type cardDbQueries struct {
+	NumAtomicPropertiesQuery *sql.Stmt
+	AtomicPropertiesIdQuery *sql.Stmt
+	InsertAtomicPropertiesQuery *sql.Stmt
+	InsertCardQuery *sql.Stmt
+	InsertAltLangDataQuery *sql.Stmt
+	InsertCardPrintingQuery *sql.Stmt
+	InsertCardSubtypeQuery *sql.Stmt
+	InsertCardSupertypeQuery *sql.Stmt
+	InsertFrameEffectQuery *sql.Stmt
+	InsertLeadershipSkillQuery *sql.Stmt
+	InsertLegalityQuery *sql.Stmt
+	InsertOtherFaceIdQuery *sql.Stmt
+	InsertPurchaseURLQuery *sql.Stmt
+	InsertRulingQuery *sql.Stmt
+	InsertVariationQuery *sql.Stmt
+	InsertBaseTypeQuery *sql.Stmt
+}
+
+func (queries *cardDbQueries) prepareCardDbQueries(tx *sql.Tx) error {
+	var err error
+
+	queries.NumAtomicPropertiesQuery, err = tx.Prepare(`SELECT COUNT(scryfall_oracle_id)
+		FROM atomic_card_data
+		WHERE card_data_hash = ?`)
+	if err != nil {
+		return err
+	}
+
+	queries.AtomicPropertiesIdQuery, err = tx.Prepare(`SELECT atomic_card_data_id,
+		scryfall_oracle_id
+		FROM atomic_card_data
+		WHERE card_data_hash = ?`)
+	if err != nil {
+		return err
+	}
+
+	queries.InsertAtomicPropertiesQuery, err = tx.Prepare(`INSERT INTO atomic_card_data
+		(card_data_hash, color_identity, color_indicator, colors, converted_mana_cost,
+		edhrec_rank, face_converted_mana_cost, hand, is_reserved, layout, life,
+		loyalty, mana_cost, mtgstocks_id, name, card_power, scryfall_oracle_id,
+		side, text, toughness, card_type)
+		VALUES
+		(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+	if err != nil {
+		return err
+	}
+
+	queries.InsertCardQuery, err = tx.Prepare(`INSERT INTO all_cards
+		(uuid, full_card_hash, atomic_card_data_id, set_id, artist, border_color,
+		card_number, scryfall_id, watermark, frame_version, mcm_id, mcm_meta_id,
+		multiverse_id, original_text, original_type, rarity, tcgplayer_product_id,
+		duel_deck, flavor_text, has_foil, has_non_foil, is_alternative, is_arena,
+		is_full_art, is_mtgo, is_online_only, is_oversized, is_paper, is_promo,
+		is_reprint, is_starter, is_story_spotlight, is_textless, is_timeshifted,
+		mtg_arena_id, mtgo_foil_id, mtgo_id, scryfall_illustration_id)
+		VALUES
+		(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+		?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+	if err != nil {
+		return err
+	}
+
+	queries.InsertAltLangDataQuery, err = tx.Prepare(`INSERT INTO alternate_language_data
+		(atomic_card_data_id, flavor_text, language, multiverse_id, name, text, card_type)
+		VALUES
+		(?, ?, ?, ?, ?, ?, ?)`)
+	if err != nil {
+		return err
+	}
+
+	queries.InsertCardPrintingQuery, err = tx.Prepare(`INSERT INTO card_printings
+		(atomic_card_data_id, set_code)
+		VALUES
+		(?, ?)`)
+	if err != nil {
+		return err
+	}
+
+	queries.InsertCardSubtypeQuery, err = tx.Prepare(`INSERT INTO card_subtypes
+		(atomic_card_data_id, subtype_option_id)
+		VALUES
+		(?, ?)`)
+	if err != nil {
+		return err
+	}
+
+	queries.InsertCardSupertypeQuery, err = tx.Prepare(`INSERT INTO card_supertypes
+		(atomic_card_data_id, supertype_option_id)
+		VALUES
+		(?, ?)`)
+	if err != nil {
+		return err
+	}
+
+	queries.InsertFrameEffectQuery, err = tx.Prepare(`INSERT INTO frame_effects
+		(card_uuid, frame_effect_option_id)
+		VALUES
+		(?, ?)`)
+	if err != nil {
+		return err
+	}
+
+	queries.InsertLeadershipSkillQuery, err = tx.Prepare(`INSERT INTO leadership_skills
+		(atomic_card_data_id, leadership_format_id, leader_legal)
+		VALUES
+		(?, ?, ?)`)
+	if err != nil {
+		return err
+	}
+
+	queries.InsertLegalityQuery, err = tx.Prepare(`INSERT INTO legalities
+		(atomic_card_data_id, game_format_id, legality_option_id)
+		VALUES
+		(?, ?, ?)`)
+	if err != nil {
+		return err
+	}
+
+	queries.InsertOtherFaceIdQuery, err = tx.Prepare(`INSERT INTO other_faces
+		(card_uuid, other_face_uuid)
+		VALUES
+		(?, ?)`)
+	if err != nil {
+		return err
+	}
+
+	queries.InsertPurchaseURLQuery, err = tx.Prepare(`INSERT INTO purchase_urls
+		(atomic_card_data_id, purchase_site_id, purchase_url)
+		VALUES
+		(?, ?, ?)`)
+	if err != nil {
+		return err
+	}
+
+	queries.InsertRulingQuery, err = tx.Prepare(`INSERT INTO rulings
+		(atomic_card_data_id, ruling_date, ruling_text)
+		VALUES
+		(?, ?, ?)`)
+	if err != nil {
+		return err
+	}
+
+	queries.InsertVariationQuery, err = tx.Prepare(`INSERT INTO variations
+		(card_uuid, variation_uuid)
+		VALUES
+		(?, ?)`)
+	if err != nil {
+		return err
+	}
+
+	queries.InsertBaseTypeQuery, err = tx.Prepare(`INSERT INTO base_types
+		(atomic_card_data_id, base_type_option_id)
+		VALUES
+		(?, ?)`)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
-func maybeInsertSetToDb(db *sql.DB, wg *sync.WaitGroup, set MTGSet) {
+func (queries *cardDbQueries) cleanupCardDbQueries() {
+	if queries.NumAtomicPropertiesQuery != nil {
+		queries.NumAtomicPropertiesQuery.Close()
+	}
+
+	if queries.AtomicPropertiesIdQuery != nil {
+		queries.AtomicPropertiesIdQuery.Close()
+	}
+
+	if queries.InsertAtomicPropertiesQuery != nil {
+		queries.InsertAtomicPropertiesQuery.Close()
+	}
+
+	if queries.InsertCardQuery != nil {
+		queries.InsertCardQuery.Close()
+	}
+
+	if queries.InsertAltLangDataQuery != nil {
+		queries.InsertAltLangDataQuery.Close()
+	}
+
+	if queries.InsertCardPrintingQuery != nil {
+		queries.InsertCardPrintingQuery.Close()
+	}
+
+	if queries.InsertCardSubtypeQuery != nil {
+		queries.InsertCardSubtypeQuery.Close()
+	}
+
+	if queries.InsertCardSupertypeQuery != nil {
+		queries.InsertCardSupertypeQuery.Close()
+	}
+
+	if queries.InsertFrameEffectQuery != nil {
+		queries.InsertFrameEffectQuery.Close()
+	}
+
+	if queries.InsertLeadershipSkillQuery != nil {
+		queries.InsertLeadershipSkillQuery.Close()
+	}
+
+	if queries.InsertLegalityQuery != nil {
+		queries.InsertLegalityQuery.Close()
+	}
+
+	if queries.InsertOtherFaceIdQuery != nil {
+		queries.InsertOtherFaceIdQuery.Close()
+	}
+
+	if queries.InsertPurchaseURLQuery != nil {
+		queries.InsertPurchaseURLQuery.Close()
+	}
+
+	if queries.InsertRulingQuery != nil {
+		queries.InsertRulingQuery.Close()
+	}
+
+	if queries.InsertVariationQuery != nil {
+		queries.InsertVariationQuery.Close()
+	}
+
+	if queries.InsertBaseTypeQuery != nil {
+		queries.InsertBaseTypeQuery.Close()
+	}
+}
+
+func maybeInsertSetToDb(db *sql.DB, updateStats *DbUpdateStats, wg *sync.WaitGroup, set MTGSet) {
 	defer wg.Done()
 	ctx := context.Background()
 
@@ -71,13 +316,22 @@ func maybeInsertSetToDb(db *sql.DB, wg *sync.WaitGroup, set MTGSet) {
 	}
 
 	// Prepare the various statements needed for set operations
-	setHashQuery, err := tx.Prepare("SELECT set_hash FROM sets WHERE code = ?")
+	setHashQuery, err := tx.Prepare(`SELECT set_hash, set_id FROM sets WHERE code = ?`)
 	if err != nil {
 		log.Print(err)
 		tx.Rollback()
 		return
 	}
 	defer setHashQuery.Close()
+
+	cardHashQuery, err := tx.Prepare(`SELECT full_card_hash FROM all_cards
+		WHERE uuid = ?`)
+	if err != nil {
+		log.Print(err)
+		tx.Rollback()
+		return
+	}
+	defer cardHashQuery.Close()
 
 	insertSetQuery, err := tx.Prepare(`INSERT INTO sets
 		(set_hash, base_size, block_name, code, is_foreign_only, is_foil_only,
@@ -93,166 +347,6 @@ func maybeInsertSetToDb(db *sql.DB, wg *sync.WaitGroup, set MTGSet) {
 	}
 	defer insertSetQuery.Close()
 
-	// Prepare the various statements needed for card operations
-	numAtomicPropertiesQuery, err := tx.Prepare(`SELECT COUNT(scryfall_oracle_id)
-		FROM atomic_card_data
-		WHERE card_data_hash = ?`)
-	if err != nil {
-		log.Print(err)
-		return
-	}
-	defer numAtomicPropertiesQuery.Close()
-
-	atomicPropertiesIdQuery, err := tx.Prepare(`SELECT atomic_card_data_id,
-		scryfall_oracle_id
-		FROM atomic_card_data
-		WHERE card_data_hash = ?`)
-	if err != nil {
-		log.Print(err)
-		return
-	}
-	defer atomicPropertiesIdQuery.Close()
-
-	insertAtomicPropertiesQuery, err := tx.Prepare(`INSERT INTO atomic_card_data
-		(card_data_hash, color_identity, color_indicator, colors, converted_mana_cost,
-		edhrec_rank, face_converted_mana_cost, hand, is_reserved, layout, life,
-		loyalty, mana_cost, mtgstocks_id, name, card_power, scryfall_oracle_id,
-		side, text, toughness, card_type)
-		VALUES
-		(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-	if err != nil {
-		log.Print(err)
-		return
-	}
-	defer insertAtomicPropertiesQuery.Close()
-
-	insertCardQuery, err := tx.Prepare(`INSERT INTO all_cards
-		(uuid, full_card_hash, atomic_card_data_id, set_id, artist, border_color,
-		card_number, scryfall_id, watermark, frame_version, mcm_id, mcm_meta_id,
-		multiverse_id, original_text, original_type, rarity, tcgplayer_product_id,
-		duel_deck, flavor_text, has_foil, has_non_foil, is_alternative, is_arena,
-		is_full_art, is_mtgo, is_online_only, is_oversized, is_paper, is_promo,
-		is_reprint, is_starter, is_story_spotlight, is_textless, is_timeshifted,
-		mtg_arena_id, mtgo_foil_id, mtgo_id, scryfall_illustration_id)
-		VALUES
-		(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-		?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-	if err != nil {
-		log.Print(err)
-		return
-	}
-	defer insertCardQuery.Close()
-
-	insertAltLangDataQuery, err := tx.Prepare(`INSERT INTO alternate_language_data
-		(atomic_card_data_id, flavor_text, language, multiverse_id, name, text, card_type)
-		VALUES
-		(?, ?, ?, ?, ?, ?, ?)`)
-	if err != nil {
-		log.Print(err)
-		return
-	}
-	defer insertAltLangDataQuery.Close()
-
-	insertCardPrintingQuery, err := tx.Prepare(`INSERT INTO card_printings
-		(atomic_card_data_id, set_code)
-		VALUES
-		(?, ?)`)
-	if err != nil {
-		log.Print(err)
-		return
-	}
-	defer insertCardPrintingQuery.Close()
-
-	insertCardSubtypeQuery, err := tx.Prepare(`INSERT INTO card_subtypes
-		(atomic_card_data_id, subtype_option_id)
-		VALUES
-		(?, ?)`)
-	if err != nil {
-		log.Print(err)
-		return
-	}
-	defer insertCardSubtypeQuery.Close()
-
-	insertCardSupertypeQuery, err := tx.Prepare(`INSERT INTO card_supertypes
-		(atomic_card_data_id, supertype_option_id)
-		VALUES
-		(?, ?)`)
-	if err != nil {
-		log.Print(err)
-		return
-	}
-	defer insertCardSupertypeQuery.Close()
-
-	insertFrameEffectQuery, err := tx.Prepare(`INSERT INTO frame_effects
-		(card_uuid, frame_effect_option_id)
-		VALUES
-		(?, ?)`)
-	if err != nil {
-		log.Print(err)
-		return
-	}
-	defer insertFrameEffectQuery.Close()
-
-	insertLeadershipSkillQuery, err := tx.Prepare(`INSERT INTO leadership_skills
-		(atomic_card_data_id, leadership_format_id, leader_legal)
-		VALUES
-		(?, ?, ?)`)
-	if err != nil {
-		log.Print(err)
-		return
-	}
-	defer insertLeadershipSkillQuery.Close()
-
-	insertLegalityQuery, err := tx.Prepare(`INSERT INTO legalities
-		(atomic_card_data_id, game_format_id, legality_option_id)
-		VALUES
-		(?, ?, ?)`)
-	if err != nil {
-		log.Print(err)
-		return
-	}
-	defer insertLegalityQuery.Close()
-
-	insertOtherFaceIdQuery, err := tx.Prepare(`INSERT INTO other_faces
-		(card_uuid, other_face_uuid)
-		VALUES
-		(?, ?)`)
-	if err != nil {
-		log.Print(err)
-		return
-	}
-	defer insertOtherFaceIdQuery.Close()
-
-	insertPurchaseUrlQuery, err := tx.Prepare(`INSERT INTO purchase_urls
-		(atomic_card_data_id, purchase_site_id, purchase_url)
-		VALUES
-		(?, ?, ?)`)
-	if err != nil {
-		log.Print(err)
-		return
-	}
-	defer insertPurchaseUrlQuery.Close()
-
-	insertRulingQuery, err := tx.Prepare(`INSERT INTO rulings
-		(atomic_card_data_id, ruling_date, ruling_text)
-		VALUES
-		(?, ?, ?)`)
-	if err != nil {
-		log.Print(err)
-		return
-	}
-	defer insertRulingQuery.Close()
-
-	insertVariationQuery, err := tx.Prepare(`INSERT INTO variations
-		(card_uuid, variation_uuid)
-		VALUES
-		(?, ?)`)
-	if err != nil {
-		log.Print(err)
-		return
-	}
-	defer insertVariationQuery.Close()
-
 	insertSetTranslationQuery, err := tx.Prepare(`INSERT INTO set_translations
 		(set_id, set_translation_language_id, set_translated_name)
 		VALUES
@@ -263,10 +357,11 @@ func maybeInsertSetToDb(db *sql.DB, wg *sync.WaitGroup, set MTGSet) {
 	}
 	defer insertSetTranslationQuery.Close()
 
-	insertBaseTypeQuery, err := tx.Prepare(`INSERT INTO base_types
-		(atomic_card_data_id, base_type_option_id)
-		VALUES
-		(?, ?)`)
+
+	// Prepare the various statements needed for card operations
+	var cardQueries cardDbQueries
+	defer cardQueries.cleanupCardDbQueries()
+	err = cardQueries.prepareCardDbQueries(tx)
 	if err != nil {
 		log.Print(err)
 		return
@@ -277,25 +372,82 @@ func maybeInsertSetToDb(db *sql.DB, wg *sync.WaitGroup, set MTGSet) {
 	setHash := HashToHexString(set.Hash())
 
 	// First, check to see if this set is in the DB at all
-	setExists, setDbHash, err := set.CheckIfSetExists(setHashQuery)
+	setExists, setDbHash, setId, err := set.CheckIfSetExists(setHashQuery)
 	if err != nil {
 		log.Print(err)
 		tx.Rollback()
 		return
 	}
 
+	updateStats.Mutex.Lock()
+	updateStats.TotalSetsInUpdate += 1
+	updateStats.Mutex.Unlock()
+
+	totalNewCards := 0
+	totalNewCardsInNewSets := 0
+	totalNewCardsInExistingSets := 0
+	totalNewAtomicCards := 0
+	totalExistingCardsHashSkipped := 0
+	totalExistingCardsUpdated := 0
+
 	if setExists {
 		log.Printf("Set %s already exists in the database\n", set.Code)
+		updateStats.Mutex.Lock()
+		updateStats.TotalExistingSetsInDb += 1
+		updateStats.Mutex.Unlock()
 		// This set already exists in the db
 		// Check to see if the hash matcdbhes what's already in the db
 		if setDbHash == setHash {
 			// Hashes match, so we can skip updating this set in the db
 			log.Printf("Set %s in db matches hash %s, skipping update...\n", set.Code, setDbHash)
+			updateStats.Mutex.Lock()
+			updateStats.ExistingSetsSkippedDueToHashMatch += 1
+			updateStats.Mutex.Unlock()
 		} else {
 			// Hashes don't match, so we need to look at each card in the set to update
 			log.Printf("Set %s hashes don't match (db: %s, json: %s), updating set...\n",
 				set.Code, setDbHash, setHash)
-			//TODO: Maybe update cards in set
+			updateStats.Mutex.Lock()
+			updateStats.ExistingSetsUpdatedDueToHashMismatch += 1
+			updateStats.Mutex.Unlock()
+
+			// For each card, check if the card exists, and if so, if the hash
+			// matches
+			for _, card := range set.Cards {
+				cardExists, cardDbHash, err := card.CheckIfCardExists(cardHashQuery)
+				if err != nil {
+					log.Print(err)
+					tx.Rollback()
+					return
+				}
+
+				if !cardExists {
+					newAtomicPropertiesAdded, err := card.InsertAllCardDataToDb(&cardQueries, setId)
+					if err != nil {
+						log.Print(err)
+						tx.Rollback()
+						return
+					}
+					if newAtomicPropertiesAdded {
+						totalNewAtomicCards += 1
+					}
+					totalNewCardsInExistingSets += 1
+				} else {
+					// Check if the stored hash matches
+					cardHash := HashToHexString(card.Hash())
+					if cardHash == cardDbHash {
+						// Can skip
+						log.Printf("Card %s hash matches in db (%s), skipping", card.Name, cardHash)
+						totalExistingCardsHashSkipped += 1
+					} else {
+						// Need to update card
+						log.Printf("Card %s hash doesn't match (db: %s, card: %s), updating",
+							card.Name, cardDbHash, cardHash)
+						totalExistingCardsUpdated += 1
+						//TODO: Actually update the card in the db
+					}
+				}
+			}
 		}
 	} else {
 		// This set does not already exist in the db
@@ -305,6 +457,9 @@ func maybeInsertSetToDb(db *sql.DB, wg *sync.WaitGroup, set MTGSet) {
 			tx.Rollback()
 			return
 		}
+		updateStats.Mutex.Lock()
+		updateStats.TotalNewSets += 1
+		updateStats.Mutex.Unlock()
 
 		// Insert the set translations
 		for lang, name := range set.Translations {
@@ -321,181 +476,216 @@ func maybeInsertSetToDb(db *sql.DB, wg *sync.WaitGroup, set MTGSet) {
 		// inserting the entire set
 		log.Printf("Processing cards in set %s\n", set.Code)
 		for _, card := range set.Cards {
+			totalNewCards += 1
+			totalNewCardsInNewSets += 1
 			card.Canonicalize()
-			// First, calculate the atomic properties hash, so we can see if this card
-			// shares its atomic properties with an existing card in the db
-			var atomicPropId int64
-			var exists bool
-			atomicPropHash := HashToHexString(card.AtomicPropertiesHash())
-			atomicPropId, exists, err = card.GetAtomicPropertiesId(numAtomicPropertiesQuery,
-					atomicPropertiesIdQuery, atomicPropHash)
+
+			newAtomicPropertiesAdded, err := card.InsertAllCardDataToDb(&cardQueries, setId)
 			if err != nil {
 				log.Print(err)
+				tx.Rollback()
 				return
 			}
-
-			if !exists {
-				// If the atomic properties don't exist already, we need to insert
-				// a new record
-				atomicPropId, err = card.InsertAtomicPropertiesToDb(insertAtomicPropertiesQuery,
-					atomicPropHash)
-				if err != nil {
-					log.Print(err)
-					return
-				}
-			}
-
-			// Now, insert the rest of the card data
-			err = card.InsertCardToDb(insertCardQuery, atomicPropId, setId)
-			if err != nil {
-				log.Print(err)
-				return
-			}
-
-			// Alternate language data
-			for _, altLangData := range card.AlternateLanguageData {
-				err = altLangData.InsertAltLangDataToDb(insertAltLangDataQuery, atomicPropId)
-				if err != nil {
-					log.Print(err)
-				}
-			}
-
-			// Frame effects
-			for _, frameEffect := range card.FrameEffects {
-				err = card.InsertFrameEffectToDb(insertFrameEffectQuery, frameEffect)
-				if err != nil {
-					log.Print(err)
-				}
-			}
-
-			// Leadership skills
-			for leadershipFormat, leaderValid := range card.LeadershipSkills {
-				err = InsertLeadershipSkillToDb(insertLeadershipSkillQuery,
-					atomicPropId, leadershipFormat, leaderValid)
-				if err != nil {
-					log.Print(err)
-				}
-			}
-
-			// Legalities
-			for format, legality := range card.Legalities {
-				err = InsertLegalityToDb( insertLegalityQuery, atomicPropId, format, legality)
-				if err != nil {
-					log.Print(err)
-				}
-			}
-
-			// Other face IDs
-			for _, otherFaceId := range card.OtherFaceIds {
-				err = card.InsertOtherFaceIdToDb(insertOtherFaceIdQuery, otherFaceId)
-				if err != nil {
-					log.Print(err)
-				}
-			}
-
-			// Printings
-			for _, setCode := range card.Printings {
-				err = InsertCardPrintingToDb(insertCardPrintingQuery, atomicPropId, setCode)
-				if err != nil {
-					log.Print(err)
-				}
-			}
-
-			// Purchase URLs
-			for site, url := range card.PurchaseURLs {
-				err = InsertPurchaseURLToDb(insertPurchaseUrlQuery, atomicPropId, site, url)
-			}
-			if err != nil {
-				log.Print(err)
-			}
-
-			// Rulings
-			for _, ruling := range card.Rulings {
-				err = ruling.InsertRulingToDb(insertRulingQuery, atomicPropId)
-				if err != nil {
-					log.Print(err)
-				}
-			}
-
-			// Subtypes
-			for _, subtype := range card.Subtypes {
-				err = InsertCardSubtypeToDb(insertCardSubtypeQuery, atomicPropId, subtype)
-				if err != nil {
-					log.Print(err)
-				}
-			}
-
-			// Supertypes
-			for _, supertype := range card.Supertypes {
-				err = InsertCardSupertypeToDb(insertCardSupertypeQuery, atomicPropId, supertype)
-				if err != nil {
-					log.Print(err)
-				}
-			}
-
-			// Calculate the set of "base" types, which I'm defining as the set
-			// subtraction of card.Types - (card.Subtypes + card.Supertypes)
-			cardBaseTypes := make(map[string]bool)
-			for _, cardType := range card.Types {
-				var inSubtype, inSupertype bool
-				for _, subtype := range card.Subtypes {
-					if subtype == cardType {
-						inSubtype = true
-						break
-					}
-				}
-				for _, supertype := range card.Supertypes {
-					if supertype == cardType {
-						inSupertype = true
-						break
-					}
-				}
-				if !inSubtype && !inSupertype {
-					cardBaseTypes[cardType] = true
-				}
-			}
-			for baseType, _ := range cardBaseTypes {
-				err = InsertBaseTypeToDb(insertBaseTypeQuery, atomicPropId, baseType)
-				if err != nil {
-					log.Print(err)
-				}
-			}
-
-			// Variations
-			for _, variation := range card.Variations {
-				err = card.InsertVariationToDb(insertVariationQuery, variation)
-				if err != nil {
-					log.Print(err)
-				}
+			if newAtomicPropertiesAdded {
+				totalNewAtomicCards += 1
 			}
 		}
 	}
 
 	tx.Commit()
+	updateStats.Mutex.Lock()
+	updateStats.TotalCardsInUpdate += totalNewCards
+	updateStats.TotalNewCards += totalNewCards
+	updateStats.TotalNewCardsInNewSets += totalNewCardsInNewSets
+	updateStats.TotalNewAtomicCards += totalNewAtomicCards
+	updateStats.TotalNewCardsInExistingSets += totalNewCardsInExistingSets
+	updateStats.ExistingCardsSkippedDueToHashMatch += totalExistingCardsHashSkipped
+	updateStats.ExistingCardsUpdatedDueToHashMismatch += totalExistingCardsUpdated
+	updateStats.Mutex.Unlock()
 	log.Printf("Done processing set %s\n", set.Code)
 }
 
-func (set *MTGSet) CheckIfSetExists(query *sql.Stmt) (bool, string, error) {
-	// First, check to see if this set is in the DB at all
-	setRows, err := query.Query(set.Code)
-	if err != nil {
-		return false, "", err
-	}
-	defer setRows.Close()
+func (card *MTGCard) InsertAllCardDataToDb(queries *cardDbQueries, setId int64) (bool, error) {
+	newAtomicPropertiesAdded := false
 
-	if setRows.Next() {
-		// This set already exists in the db
-		// Get the hash associated with the existing set
-		var dbSetHash string
-		err := setRows.Scan(&dbSetHash)
+	// First, calculate the atomic properties hash, so we can see if this card
+	// shares its atomic properties with an existing card in the db
+	atomicPropHash := HashToHexString(card.AtomicPropertiesHash())
+	atomicPropId, exists, err := card.GetAtomicPropertiesId(queries.NumAtomicPropertiesQuery,
+		queries.AtomicPropertiesIdQuery, atomicPropHash)
+	if err != nil {
+		return false, err
+	}
+
+	if !exists {
+		// If the atomic properties don't exist already, we need to insert
+		// a new record
+		atomicPropId, err = card.InsertAtomicPropertiesToDb(queries.InsertAtomicPropertiesQuery,
+			atomicPropHash)
 		if err != nil {
+			return false, err
+		}
+		newAtomicPropertiesAdded = true
+	}
+
+	// Now, insert the rest of the card data
+	err = card.InsertCardToDb(queries.InsertCardQuery, atomicPropId, setId)
+	if err != nil {
+		return false, err
+	}
+
+	// Alternate language data
+	for _, altLangData := range card.AlternateLanguageData {
+		err = altLangData.InsertAltLangDataToDb(queries.InsertAltLangDataQuery, atomicPropId)
+		if err != nil {
+			return false, err
+		}
+	}
+
+	// Frame effects
+	for _, frameEffect := range card.FrameEffects {
+		err = card.InsertFrameEffectToDb(queries.InsertFrameEffectQuery, frameEffect)
+		if err != nil {
+			return false, err
+		}
+	}
+
+	// Leadership skills
+	for leadershipFormat, leaderValid := range card.LeadershipSkills {
+		err = InsertLeadershipSkillToDb(queries.InsertLeadershipSkillQuery,
+			atomicPropId, leadershipFormat, leaderValid)
+		if err != nil {
+			return false, err
+		}
+	}
+
+	// Legalities
+	for format, legality := range card.Legalities {
+		err = InsertLegalityToDb(queries.InsertLegalityQuery, atomicPropId, format, legality)
+		if err != nil {
+			return false, err
+		}
+	}
+
+	// Other face IDs
+	for _, otherFaceId := range card.OtherFaceIds {
+		err = card.InsertOtherFaceIdToDb(queries.InsertOtherFaceIdQuery, otherFaceId)
+		if err != nil {
+			return false, err
+		}
+	}
+
+	// Printings
+	for _, setCode := range card.Printings {
+		err = InsertCardPrintingToDb(queries.InsertCardPrintingQuery, atomicPropId, setCode)
+		if err != nil {
+			return false, err
+		}
+	}
+
+	// Purchase URLs
+	for site, url := range card.PurchaseURLs {
+		err = InsertPurchaseURLToDb(queries.InsertPurchaseURLQuery, atomicPropId, site, url)
+		if err != nil {
+			return false, err
+		}
+	}
+
+	// Rulings
+	for _, ruling := range card.Rulings {
+		err = ruling.InsertRulingToDb(queries.InsertRulingQuery, atomicPropId)
+		if err != nil {
+			return false, err
+		}
+	}
+
+	// Subtypes
+	for _, subtype := range card.Subtypes {
+		err = InsertCardSubtypeToDb(queries.InsertCardSubtypeQuery, atomicPropId, subtype)
+		if err != nil {
+			return false, err
+		}
+	}
+
+	// Supertypes
+	for _, supertype := range card.Supertypes {
+		err = InsertCardSupertypeToDb(queries.InsertCardSupertypeQuery, atomicPropId, supertype)
+		if err != nil {
+			return false, err
+		}
+	}
+
+	// Calculate the set of "base" types, which I'm defining as the set
+	// subtraction of card.Types - (card.Subtypes + card.Supertypes)
+	cardBaseTypes := make(map[string]bool)
+	for _, cardType := range card.Types {
+		var inSubtype, inSupertype bool
+		for _, subtype := range card.Subtypes {
+			if subtype == cardType {
+				inSubtype = true
+				break
+			}
+		}
+		for _, supertype := range card.Supertypes {
+			if supertype == cardType {
+				inSupertype = true
+				break
+			}
+		}
+		if !inSubtype && !inSupertype {
+			cardBaseTypes[cardType] = true
+		}
+	}
+	for baseType, _ := range cardBaseTypes {
+		err = InsertBaseTypeToDb(queries.InsertBaseTypeQuery, atomicPropId, baseType)
+		if err != nil {
+			return false, err
+		}
+	}
+
+	// Variations
+	for _, variation := range card.Variations {
+		err = card.InsertVariationToDb(queries.InsertVariationQuery, variation)
+		if err != nil {
+			return false, err
+		}
+	}
+
+	return newAtomicPropertiesAdded, nil
+}
+
+func (card *MTGCard) CheckIfCardExists(query *sql.Stmt) (bool, string, error) {
+	resultRow := query.QueryRow(card.UUID)
+
+	var cardHash string
+	err := resultRow.Scan(&cardHash)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			// This card isn't in the database
+			return false, "", nil
+		} else {
 			return false, "", err
 		}
-
-		return true, dbSetHash, nil
 	} else {
-		// This set doesn't exist in the db
-		return false, "", nil
+		return true, cardHash, nil
+	}
+}
+
+func (set *MTGSet) CheckIfSetExists(query *sql.Stmt) (bool, string, int64, error) {
+	resultRow := query.QueryRow(set.Code)
+
+	var setHash string
+	var setId int64
+	err := resultRow.Scan(&setHash, &setId)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			// This set isn't in the database
+			return false, "", 0, nil
+		} else {
+			return false, "", 0, err
+		}
+	} else {
+		return true, setHash, setId, nil
 	}
 }
 
