@@ -28,22 +28,6 @@ func HashToHexString(hashVal hash.Hash) string {
 	return hex.EncodeToString(hashBytes)
 }
 
-type DbUpdateStats struct {
-	Mutex sync.Mutex
-	TotalSetsInUpdate int
-	TotalExistingSetsInDb int
-	TotalNewSets int
-	ExistingSetsSkippedDueToHashMatch int
-	ExistingSetsUpdatedDueToHashMismatch int
-	TotalCardsInUpdate int
-	TotalNewCards int
-	TotalNewAtomicCards int
-	TotalNewCardsInNewSets int
-	TotalNewCardsInExistingSets int
-	ExistingCardsSkippedDueToHashMatch int
-	ExistingCardsUpdatedDueToHashMismatch int
-}
-
 func ImportSetsToDb(db *sql.DB, sets map[string]MTGSet) (*DbUpdateStats, error) {
 	var setImportWg sync.WaitGroup
 	var updateStats DbUpdateStats
@@ -477,37 +461,30 @@ func maybeInsertSetToDb(db *sql.DB, updateStats *DbUpdateStats, wg *sync.WaitGro
 		return
 	}
 
-	updateStats.Mutex.Lock()
-	updateStats.TotalSetsInUpdate += 1
-	updateStats.Mutex.Unlock()
+	updateStats.AddToTotalSets(1)
 
 	totalNewCards := 0
 	totalNewCardsInNewSets := 0
 	totalNewCardsInExistingSets := 0
 	totalNewAtomicCards := 0
+	totalExistingCards := 0
 	totalExistingCardsHashSkipped := 0
 	totalExistingCardsUpdated := 0
 
 	if setExists {
 		log.Printf("Set %s already exists in the database\n", set.Code)
-		updateStats.Mutex.Lock()
-		updateStats.TotalExistingSetsInDb += 1
-		updateStats.Mutex.Unlock()
+		updateStats.AddToTotalExistingSets(1)
 		// This set already exists in the db
 		// Check to see if the hash matcdbhes what's already in the db
 		if setDbHash == setHash {
 			// Hashes match, so we can skip updating this set in the db
 			log.Printf("Set %s in db matches hash %s, skipping update...\n", set.Code, setDbHash)
-			updateStats.Mutex.Lock()
-			updateStats.ExistingSetsSkippedDueToHashMatch += 1
-			updateStats.Mutex.Unlock()
+			updateStats.AddToExistingSetsSkipped(1)
 		} else {
 			// Hashes don't match, so we need to look at each card in the set to update
 			log.Printf("Set %s hashes don't match (db: %s, json: %s), updating set...\n",
 				set.Code, setDbHash, setHash)
-			updateStats.Mutex.Lock()
-			updateStats.ExistingSetsUpdatedDueToHashMismatch += 1
-			updateStats.Mutex.Unlock()
+			updateStats.AddToExistingSetsUpdated(1)
 
 			// For each card, check if the card exists, and if so, if the hash
 			// matches
@@ -531,6 +508,7 @@ func maybeInsertSetToDb(db *sql.DB, updateStats *DbUpdateStats, wg *sync.WaitGro
 					}
 					totalNewCardsInExistingSets += 1
 				} else {
+					totalExistingCards += 1
 					// Check if the stored hash matches
 					cardHash := HashToHexString(card.Hash())
 					if cardHash == cardDbHash {
@@ -560,9 +538,7 @@ func maybeInsertSetToDb(db *sql.DB, updateStats *DbUpdateStats, wg *sync.WaitGro
 			tx.Rollback()
 			return
 		}
-		updateStats.Mutex.Lock()
-		updateStats.TotalNewSets += 1
-		updateStats.Mutex.Unlock()
+		updateStats.AddToTotalNewSets(1)
 
 		// Insert the set translations
 		for lang, name := range set.Translations {
@@ -596,15 +572,14 @@ func maybeInsertSetToDb(db *sql.DB, updateStats *DbUpdateStats, wg *sync.WaitGro
 	}
 
 	tx.Commit()
-	updateStats.Mutex.Lock()
-	updateStats.TotalCardsInUpdate += totalNewCards
-	updateStats.TotalNewCards += totalNewCards
-	updateStats.TotalNewCardsInNewSets += totalNewCardsInNewSets
-	updateStats.TotalNewAtomicCards += totalNewAtomicCards
-	updateStats.TotalNewCardsInExistingSets += totalNewCardsInExistingSets
-	updateStats.ExistingCardsSkippedDueToHashMatch += totalExistingCardsHashSkipped
-	updateStats.ExistingCardsUpdatedDueToHashMismatch += totalExistingCardsUpdated
-	updateStats.Mutex.Unlock()
+	updateStats.AddToTotalCards(totalNewCards)
+	updateStats.AddToTotalNewCards(totalNewCards)
+	updateStats.AddToTotalNewCardsInNewSets(totalNewCardsInNewSets)
+	updateStats.AddToTotalNewCardsInExistingSets(totalNewCardsInExistingSets)
+	updateStats.AddToTotalNewAtomicCards(totalNewAtomicCards)
+	updateStats.AddToTotalExistingCards(totalExistingCards)
+	updateStats.AddToExistingCardsSkipped(totalExistingCardsHashSkipped)
+	updateStats.AddToExistingCardsUpdated(totalExistingCardsUpdated)
 	log.Printf("Done processing set %s\n", set.Code)
 }
 

@@ -25,20 +25,17 @@ func main() {
 		log.Fatal(err)
 	}
 	log.Printf("Finished DB Update\n")
-	log.Printf("Total sets in update: %d\n", dbUpdateStats.TotalSetsInUpdate)
-	log.Printf("Total existing sets in the database: %d\n", dbUpdateStats.TotalExistingSetsInDb)
-	log.Printf("Total new sets: %d\n", dbUpdateStats.TotalNewSets)
-	log.Printf("Existing sets skipped due to hash match: %d\n",
-		dbUpdateStats.ExistingSetsSkippedDueToHashMatch)
-	log.Printf("Existing sets updated due to hash mismatch: %d\n",
-		dbUpdateStats.ExistingSetsUpdatedDueToHashMismatch)
-	log.Printf("Total cards in update: %d\n", dbUpdateStats.TotalCardsInUpdate)
-	log.Printf("Total new cards: %d\n", dbUpdateStats.TotalNewCards)
-	log.Printf("Total new cards in new sets: %d\n", dbUpdateStats.TotalNewCardsInNewSets)
-	log.Printf("Total new cards in existing sets: %d\n", dbUpdateStats.TotalNewCardsInExistingSets)
-	log.Printf("Total new atomic cards: %d\n", dbUpdateStats.TotalNewAtomicCards)
-	log.Printf("Existing cards skipped due to hash match: %d\n",
-		dbUpdateStats.ExistingCardsSkippedDueToHashMatch)
-	log.Printf("Existing cards updated due to hash mismatch: %d\n",
-		dbUpdateStats.ExistingCardsUpdatedDueToHashMismatch)
+	log.Printf("Total sets in update: %d\n", dbUpdateStats.TotalSets())
+	log.Printf("Total existing sets in the database: %d\n", dbUpdateStats.TotalExistingSets())
+	log.Printf("Total new sets: %d\n", dbUpdateStats.TotalNewSets())
+	log.Printf("Existing sets skipped due to hash match: %d\n", dbUpdateStats.ExistingSetsSkipped())
+	log.Printf("Existing sets updated due to hash mismatch: %d\n", dbUpdateStats.ExistingSetsUpdated())
+	log.Printf("Total cards in update: %d\n", dbUpdateStats.TotalCards())
+	log.Printf("Total new cards: %d\n", dbUpdateStats.TotalNewCards())
+	log.Printf("Total new cards in new sets: %d\n", dbUpdateStats.TotalNewCardsInNewSets())
+	log.Printf("Total new cards in existing sets: %d\n", dbUpdateStats.TotalNewCardsInExistingSets())
+	log.Printf("Total new atomic cards: %d\n", dbUpdateStats.TotalNewAtomicCards())
+	log.Printf("Total existing cards: %d\n", dbUpdateStats.TotalExistingCards())
+	log.Printf("Existing cards skipped due to hash match: %d\n", dbUpdateStats.ExistingCardsSkipped())
+	log.Printf("Existing cards updated due to hash mismatch: %d\n", dbUpdateStats.ExistingCardsUpdated())
 }
