@@ -430,6 +430,33 @@ func maybeInsertSetToDb(db *sql.DB, updateStats *DbUpdateStats, wg *sync.WaitGro
 	}
 	defer insertSetQuery.Close()
 
+	updateSetQuery, err := tx.Prepare(`UPDATE sets SET
+		set_hash = ?,
+		base_size = ?,
+		block_name = ?,
+		code = ?,
+		is_foreign_only = ?,
+		is_foil_only = ?,
+		is_online_only = ?,
+		is_partial_preview = ?,
+		keyrune_code = ?,
+		mcm_name = ?,
+		mcm_id = ?,
+		mtgo_code = ?,
+		name = ?,
+		parent_code = ?,
+		release_date = ?,
+		tcgplayer_group_id = ?,
+		total_set_size = ?,
+		set_type = ?
+		WHERE set_id = ?`)
+	if err != nil {
+		log.Print(err)
+		tx.Rollback()
+		return
+	}
+	defer updateSetQuery.Close()
+
 	insertSetTranslationQuery, err := tx.Prepare(`INSERT INTO set_translations
 		(set_id, set_translation_language_id, set_translated_name)
 		VALUES
@@ -481,9 +508,16 @@ func maybeInsertSetToDb(db *sql.DB, updateStats *DbUpdateStats, wg *sync.WaitGro
 			log.Printf("Set %s in db matches hash %s, skipping update...\n", set.Code, setDbHash)
 			updateStats.AddToExistingSetsSkipped(1)
 		} else {
-			// Hashes don't match, so we need to look at each card in the set to update
+			// Hashes don't match, so we need to first update the set itself, and then
+			// look at each card in the set to see if it needs to be updated
 			log.Printf("Set %s hashes don't match (db: %s, json: %s), updating set...\n",
 				set.Code, setDbHash, setHash)
+			err := set.UpdateSetInDb(updateSetQuery, setHash, setId)
+			if err != nil {
+				log.Print(err)
+				tx.Rollback()
+				return
+			}
 			updateStats.AddToExistingSetsUpdated(1)
 
 			// For each card, check if the card exists, and if so, if the hash
@@ -506,6 +540,7 @@ func maybeInsertSetToDb(db *sql.DB, updateStats *DbUpdateStats, wg *sync.WaitGro
 					if newAtomicPropertiesAdded {
 						totalNewAtomicCards += 1
 					}
+					totalNewCards += 1
 					totalNewCardsInExistingSets += 1
 				} else {
 					totalExistingCards += 1
@@ -772,6 +807,18 @@ func (set *MTGSet) InsertSetToDb(query *sql.Stmt, setHash string) (int64, error)
 	}
 
 	return setId, nil
+}
+
+func (set *MTGSet) UpdateSetInDb(query *sql.Stmt, setHash string, setId int64) error {
+	res, err := query.Exec(setHash, set.BaseSetSize, set.Block, set.Code, set.IsForeignOnly,
+		set.IsFoilOnly, set.IsOnlineOnly, set.IsPartialPreview, set.KeyruneCode, set.MCMName,
+		set.MCMId, set.MTGOCode, set.Name, set.ParentCode, set.ReleaseDate, set.TCGPlayerGroupId,
+		set.TotalSetSize, set.Type, setId)
+	if err != nil {
+		return err
+	}
+
+	return checkRowsAffected(res, 1, "update set")
 }
 
 func InsertSetTranslationToDb(query *sql.Stmt, setId int64, translationLang string,
