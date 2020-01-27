@@ -23,6 +23,7 @@ CREATE TABLE mtg_cards.atomic_card_data (
 	text VARCHAR(1500) NOT NULL COLLATE utf8mb4_general_ci, #Max existing len: 770
 	toughness VARCHAR(10) NOT NULL COLLATE utf8mb4_general_ci, #Max existing len: 3
 	card_type VARCHAR(100) NOT NULL COLLATE utf8mb4_general_ci, #Max existing len: 46
+	ref_cnt INT NOT NULL DEFAULT 1,
 	INDEX name_index (name)
 ) DEFAULT COLLATE utf8mb4_bin;
 
