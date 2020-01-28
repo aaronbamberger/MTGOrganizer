@@ -4,7 +4,7 @@ import "database/sql"
 import "fmt"
 import "strings"
 
-func (card *MTGCard) InsertAtomicPropertiesToDb(queries *cardDbQueries,
+func (card *MTGCard) InsertAtomicPropertiesToDb(queries *dbQueries,
 		atomicPropertiesHash string) (int64, error) {
 	// Build the set values needed for color_identity, color_indicator, and colors
 	var colorIdentity sql.NullString
@@ -195,7 +195,7 @@ func (card *MTGCard) InsertAtomicPropertiesToDb(queries *cardDbQueries,
 	return atomicPropId, nil
 }
 
-func InsertCardSubtypeToDb(queries *cardDbQueries, atomicPropertiesId int64, subtype string) error {
+func InsertCardSubtypeToDb(queries *dbQueries, atomicPropertiesId int64, subtype string) error {
 	subtypeId, err := getSubtypeOptionId(subtype)
 	if err != nil {
 		return err
@@ -209,7 +209,7 @@ func InsertCardSubtypeToDb(queries *cardDbQueries, atomicPropertiesId int64, sub
 	return checkRowsAffected(res, 1, "insert card subtype")
 }
 
-func InsertCardSupertypeToDb(queries *cardDbQueries, atomicPropertiesId int64, supertype string) error {
+func InsertCardSupertypeToDb(queries *dbQueries, atomicPropertiesId int64, supertype string) error {
 	supertypeId, err := getSupertypeOptionId(supertype)
 	if err != nil {
 		return err
@@ -223,7 +223,7 @@ func InsertCardSupertypeToDb(queries *cardDbQueries, atomicPropertiesId int64, s
 	return checkRowsAffected(res, 1, "insert card supertype")
 }
 
-func (altLangInfo *MTGCardAlternateLanguageInfo) InsertAltLangDataToDb(queries *cardDbQueries,
+func (altLangInfo *MTGCardAlternateLanguageInfo) InsertAltLangDataToDb(queries *dbQueries,
 		atomicPropertiesId int64) error {
 	res, err := queries.InsertAltLangDataQuery.Exec(atomicPropertiesId, altLangInfo.FlavorText,
 		altLangInfo.Language, altLangInfo.MultiverseId, altLangInfo.Name,
@@ -235,7 +235,7 @@ func (altLangInfo *MTGCardAlternateLanguageInfo) InsertAltLangDataToDb(queries *
 	return checkRowsAffected(res, 1, "insert alt lang info")
 }
 
-func (ruling *MTGCardRuling) InsertRulingToDb(queries *cardDbQueries, atomicPropertiesId int64) error {
+func (ruling *MTGCardRuling) InsertRulingToDb(queries *dbQueries, atomicPropertiesId int64) error {
 	res, err := queries.InsertRulingQuery.Exec(atomicPropertiesId, ruling.Date, ruling.Text)
 	if err != nil {
 		return err
@@ -244,7 +244,7 @@ func (ruling *MTGCardRuling) InsertRulingToDb(queries *cardDbQueries, atomicProp
 	return checkRowsAffected(res, 1, "insert ruling")
 }
 
-func InsertBaseTypeToDb(queries *cardDbQueries, atomicPropertiesId int64,
+func InsertBaseTypeToDb(queries *dbQueries, atomicPropertiesId int64,
 		baseTypeOption string) error {
 	baseTypeOptionId, err := getBaseTypeOptionId(baseTypeOption)
 	if err != nil {
@@ -259,7 +259,7 @@ func InsertBaseTypeToDb(queries *cardDbQueries, atomicPropertiesId int64,
 	return checkRowsAffected(res, 1, "insert base type")
 }
 
-func InsertLeadershipSkillToDb(queries *cardDbQueries, atomicPropertiesId int64,
+func InsertLeadershipSkillToDb(queries *dbQueries, atomicPropertiesId int64,
 		leadershipFormat string, leaderLegal bool) error {
 
 	leadershipFormatId, err := getLeadershipFormatId(leadershipFormat)
@@ -276,7 +276,7 @@ func InsertLeadershipSkillToDb(queries *cardDbQueries, atomicPropertiesId int64,
 	return checkRowsAffected(res, 1, "insert leadership skill")
 }
 
-func InsertLegalityToDb(queries *cardDbQueries, atomicPropertiesId int64, gameFormat string,
+func InsertLegalityToDb(queries *dbQueries, atomicPropertiesId int64, gameFormat string,
 		legalityOption string) error {
 	gameFormatId, err := getGameFormatId(gameFormat)
 	if err != nil {
@@ -296,7 +296,7 @@ func InsertLegalityToDb(queries *cardDbQueries, atomicPropertiesId int64, gameFo
 	return checkRowsAffected(res, 1, "insert legality")
 }
 
-func InsertCardPrintingToDb(queries *cardDbQueries, atomicPropertiesId int64, setCode string) error {
+func InsertCardPrintingToDb(queries *dbQueries, atomicPropertiesId int64, setCode string) error {
 	res, err := queries.InsertCardPrintingQuery.Exec(atomicPropertiesId, setCode)
 	if err != nil {
 		return err
@@ -305,7 +305,7 @@ func InsertCardPrintingToDb(queries *cardDbQueries, atomicPropertiesId int64, se
 	return checkRowsAffected(res, 1, "insert card printing")
 }
 
-func InsertPurchaseURLToDb(queries *cardDbQueries, atomicPropertiesId int64,
+func InsertPurchaseURLToDb(queries *dbQueries, atomicPropertiesId int64,
 		purchaseSite string, purchaseURL string) error {
 	purchaseSiteId, err := getPurchaseSiteId(purchaseSite)
 	if err != nil {
@@ -320,7 +320,7 @@ func InsertPurchaseURLToDb(queries *cardDbQueries, atomicPropertiesId int64,
 	return checkRowsAffected(res, 1, "insert purchase url")
 }
 
-func (card *MTGCard) GetAtomicPropertiesId(queries *cardDbQueries,
+func (card *MTGCard) GetAtomicPropertiesId(queries *dbQueries,
         atomicPropertiesHash string) (int64, int64, bool, error) {
 	// First, check how many entries are already in the db with this card hash
 	// If it's 0, this atomic data isn't in the db, so we can return without getting the id
