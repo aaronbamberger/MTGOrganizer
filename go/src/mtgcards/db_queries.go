@@ -30,6 +30,16 @@ type dbQueries struct {
 	DeleteOtherFaceQuery *sql.Stmt
 	DeleteVariationQuery *sql.Stmt
 	UpdateRefCntQuery *sql.Stmt
+    DeleteAtomicPropertiesQuery *sql.Stmt
+    DeleteAltLangDataQuery *sql.Stmt
+    DeleteBaseTypesQuery *sql.Stmt
+    DeleteCardPrintingsQuery *sql.Stmt
+    DeleteCardSubtypesQuery *sql.Stmt
+    DeleteCardSupertypesQuery *sql.Stmt
+    DeleteLeadershipSkillsQuery *sql.Stmt
+    DeleteLegalitiesQuery *sql.Stmt
+    DeletePurchaseURLsQuery *sql.Stmt
+    DeleteRulingsQuery *sql.Stmt
 }
 
 func (queries *dbQueries) queriesForTx(tx *sql.Tx) *dbQueries {
@@ -61,6 +71,16 @@ func (queries *dbQueries) queriesForTx(tx *sql.Tx) *dbQueries {
     txQueries.DeleteOtherFaceQuery = tx.Stmt(queries.DeleteOtherFaceQuery)
     txQueries.DeleteVariationQuery = tx.Stmt(queries.DeleteVariationQuery)
     txQueries.UpdateRefCntQuery = tx.Stmt(queries.UpdateRefCntQuery)
+    txQueries.DeleteAtomicPropertiesQuery = tx.Stmt(queries.DeleteAtomicPropertiesQuery)
+    txQueries.DeleteAltLangDataQuery = tx.Stmt(queries.DeleteAltLangDataQuery)
+    txQueries.DeleteBaseTypesQuery = tx.Stmt(queries.DeleteBaseTypesQuery)
+    txQueries.DeleteCardPrintingsQuery = tx.Stmt(queries.DeleteCardPrintingsQuery)
+    txQueries.DeleteCardSubtypesQuery = tx.Stmt(queries.DeleteCardSubtypesQuery)
+    txQueries.DeleteCardSupertypesQuery = tx.Stmt(queries.DeleteCardSupertypesQuery)
+    txQueries.DeleteLeadershipSkillsQuery = tx.Stmt(queries.DeleteLeadershipSkillsQuery)
+    txQueries.DeleteLegalitiesQuery = tx.Stmt(queries.DeleteLegalitiesQuery)
+    txQueries.DeletePurchaseURLsQuery = tx.Stmt(queries.DeletePurchaseURLsQuery)
+    txQueries.DeleteRulingsQuery = tx.Stmt(queries.DeleteRulingsQuery)
 
     return &txQueries
 }
@@ -134,14 +154,17 @@ func prepareDbQueries(db *sql.DB) (*dbQueries, error) {
 		ref_cnt,
 		scryfall_oracle_id
 		FROM atomic_card_data
-		WHERE card_data_hash = ?`)
+		WHERE card_data_hash = ?
+        FOR UPDATE`)
 	if err != nil {
 		return &queries, err
 	}
 
-	queries.AtomicPropertiesHashQuery, err = db.Prepare(`SELECT card_data_hash
+	queries.AtomicPropertiesHashQuery, err = db.Prepare(`SELECT card_data_hash,
+        ref_cnt
 		FROM atomic_card_data
-		WHERE atomic_card_data_id = ?`)
+		WHERE atomic_card_data_id = ?
+        FOR UPDATE`)
 	if err != nil {
 		return &queries, err
 	}
@@ -333,7 +356,87 @@ func prepareDbQueries(db *sql.DB) (*dbQueries, error) {
 		SET ref_cnt = ?
 		WHERE atomic_card_data_id = ?`)
     if err != nil {
-        return &queries, nil
+        return &queries, err
+    }
+
+    queries.DeleteAtomicPropertiesQuery, err = db.Prepare(`DELETE FROM
+        atomic_card_data
+        WHERE
+        atomic_card_data_id = ?`)
+    if err != nil {
+        return &queries, err
+    }
+
+    queries.DeleteAltLangDataQuery, err = db.Prepare(`DELETE FROM
+        alternate_language_data
+        WHERE
+        atomic_card_data_id = ?`)
+    if err != nil {
+        return &queries, err
+    }
+
+    queries.DeleteBaseTypesQuery, err = db.Prepare(`DELETE FROM
+        base_types
+        WHERE
+        atomic_card_data_id = ?`)
+    if err != nil {
+        return &queries, err
+    }
+
+    queries.DeleteCardPrintingsQuery, err = db.Prepare(`DELETE FROM
+        card_printings
+        WHERE
+        atomic_card_data_id = ?`)
+    if err != nil {
+        return &queries, err
+    }
+
+    queries.DeleteCardSubtypesQuery, err = db.Prepare(`DELETE FROM
+        card_subtypes
+        WHERE
+        atomic_card_data_id = ?`)
+    if err != nil {
+        return &queries, err
+    }
+
+    queries.DeleteCardSupertypesQuery, err = db.Prepare(`DELETE FROM
+        card_supertypes
+        WHERE
+        atomic_card_data_id = ?`)
+    if err != nil {
+        return &queries, err
+    }
+
+    queries.DeleteLeadershipSkillsQuery, err = db.Prepare(`DELETE FROM
+        leadership_skills
+        WHERE
+        atomic_card_data_id = ?`)
+    if err != nil {
+        return &queries, err
+    }
+
+    queries.DeleteLegalitiesQuery, err = db.Prepare(`DELETE FROM
+        legalities
+        WHERE
+        atomic_card_data_id = ?`)
+    if err != nil {
+        return &queries, err
+    }
+
+    queries.DeletePurchaseURLsQuery, err = db.Prepare(`DELETE FROM
+        purchase_urls
+        WHERE
+        atomic_card_data_id = ?`)
+    if err != nil {
+        return &queries, err
+    }
+
+    queries.DeleteRulingsQuery, err = db.Prepare(`DELETE FROM
+        rulings
+        WHERE
+        atomic_card_data_id = ?`)
+    if err != nil {
+        return &queries, err
     }
 
 	return &queries, nil
@@ -447,4 +550,44 @@ func (queries *dbQueries) cleanupDbQueries() {
 	if queries.UpdateRefCntQuery != nil {
 		queries.UpdateRefCntQuery.Close()
 	}
+
+    if queries.DeleteAtomicPropertiesQuery != nil {
+        queries.DeleteAtomicPropertiesQuery.Close()
+    }
+
+    if queries.DeleteAltLangDataQuery != nil {
+        queries.DeleteAltLangDataQuery.Close()
+    }
+
+    if queries.DeleteBaseTypesQuery != nil {
+        queries.DeleteBaseTypesQuery.Close()
+    }
+
+    if queries.DeleteCardPrintingsQuery != nil {
+        queries.DeleteCardPrintingsQuery.Close()
+    }
+
+    if queries.DeleteCardSubtypesQuery != nil {
+        queries.DeleteCardSubtypesQuery.Close()
+    }
+
+    if queries.DeleteCardSupertypesQuery != nil {
+        queries.DeleteCardSupertypesQuery.Close()
+    }
+
+    if queries.DeleteLeadershipSkillsQuery != nil {
+        queries.DeleteLeadershipSkillsQuery.Close()
+    }
+
+    if queries.DeleteLegalitiesQuery != nil {
+        queries.DeleteLegalitiesQuery.Close()
+    }
+
+    if queries.DeletePurchaseURLsQuery != nil {
+        queries.DeletePurchaseURLsQuery.Close()
+    }
+
+    if queries.DeleteRulingsQuery != nil {
+        queries.DeleteRulingsQuery.Close()
+    }
 }

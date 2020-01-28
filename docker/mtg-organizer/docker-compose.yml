@@ -2,7 +2,7 @@ version: '3'
 services:
     card_db:
         image: "mariadb:latest"
-        command: --max-connections 1000
+        command: --max-connections 1000 --innodb-lock-wait-timeout 300 --max-prepared-stmt-count 50000
         volumes:
             - /bagner_data/Projects/MTGOrganizer/db:/var/lib/mysql
         environment:

@@ -105,14 +105,13 @@ func maybeInsertSetToDb(db *sql.DB, queries *dbQueries, updateStats *DbUpdateSta
 
 	if setExists {
 		log.Printf("Set %s already exists in the database\n", set.Code)
-		updateStats.AddToTotalExistingSets(1)
 		// This set already exists in the db
 		// Check to see if the hash matcdbhes what's already in the db
 		if setDbHash == setHash {
 			// Hashes match, so we can skip updating this set in the db
 			log.Printf("Set %s in db matches hash %s, skipping update...\n", set.Code, setDbHash)
-			updateStats.AddToExistingSetsSkipped(1)
 			setTx.Commit()
+			updateStats.AddToExistingSetsSkipped(1)
 		} else {
 			// Hashes don't match, so we need to first update the set itself, and then
 			// look at each card in the set to see if it needs to be updated
@@ -124,8 +123,8 @@ func maybeInsertSetToDb(db *sql.DB, queries *dbQueries, updateStats *DbUpdateSta
 				setTx.Rollback()
 				return
 			}
-			updateStats.AddToExistingSetsUpdated(1)
 			setTx.Commit()
+            updateStats.AddToExistingSetsUpdated(1)
 
 			// For each card, check if the card exists, and if so, if the hash
 			// matches
@@ -153,35 +152,39 @@ func maybeInsertSetToDb(db *sql.DB, queries *dbQueries, updateStats *DbUpdateSta
 						cardTx.Rollback()
 						continue
 					}
+                    cardTx.Commit()
 					if newAtomicPropertiesAdded {
 						totalNewAtomicCards += 1
 					}
 					totalNewCards += 1
 					totalNewCardsInExistingSets += 1
 				} else {
-					totalExistingCards += 1
 					// Check if the stored hash matches
 					cardHash := HashToHexString(card.Hash())
 					if cardHash == cardDbHash {
 						// Can skip
 						log.Printf("Card %s hash matches in db (%s), skipping", card.Name, cardHash)
+                        cardTx.Commit()
+                        totalExistingCards += 1
 						totalExistingCardsHashSkipped += 1
 					} else {
 						// Need to update card
 						log.Printf("Card %s hash doesn't match (db: %s, card: %s), updating",
 							card.Name, cardDbHash, cardHash)
-						totalExistingCardsUpdated += 1
 						err := card.UpdateCardDataInDb(cardQueries, atomicCardDataId, setId)
 						if err != nil {
 							log.Print(err)
 							cardTx.Rollback()
 							continue
 						}
+                        cardTx.Commit()
+                        totalExistingCards += 1
+                        totalExistingCardsUpdated += 1
 					}
 				}
-				cardTx.Commit()
 			}
 		}
+		updateStats.AddToTotalExistingSets(1)
 	} else {
 		// This set does not already exist in the db
 		setId, err := set.InsertSetToDb(setQueries, setHash)
@@ -190,7 +193,6 @@ func maybeInsertSetToDb(db *sql.DB, queries *dbQueries, updateStats *DbUpdateSta
 			setTx.Rollback()
 			return
 		}
-		updateStats.AddToTotalNewSets(1)
 
 		// Insert the set translations
 		for lang, name := range set.Translations {
@@ -203,6 +205,7 @@ func maybeInsertSetToDb(db *sql.DB, queries *dbQueries, updateStats *DbUpdateSta
 		}
 
 		setTx.Commit()
+		updateStats.AddToTotalNewSets(1)
 
 		// Insert all of the cards in the set.  No need to check the full card hash, since we're bulk
 		// inserting the entire set
@@ -217,8 +220,6 @@ func maybeInsertSetToDb(db *sql.DB, queries *dbQueries, updateStats *DbUpdateSta
 
 			cardQueries := queries.queriesForTx(cardTx)
 
-			totalNewCards += 1
-			totalNewCardsInNewSets += 1
 			card.Canonicalize()
 
 			newAtomicPropertiesAdded, err := card.InsertAllCardDataToDb(cardQueries, setId)
@@ -227,10 +228,13 @@ func maybeInsertSetToDb(db *sql.DB, queries *dbQueries, updateStats *DbUpdateSta
 				cardTx.Rollback()
 				continue
 			}
+			cardTx.Commit()
+
+            totalNewCards += 1
+			totalNewCardsInNewSets += 1
 			if newAtomicPropertiesAdded {
 				totalNewAtomicCards += 1
 			}
-			cardTx.Commit()
 		}
 	}
 
@@ -252,15 +256,35 @@ func (card *MTGCard) UpdateCardDataInDb(queries *dbQueries,
 	// to the same atomic properties record.
 	var err error
 	var dbHash string
+    var refCnt int
 	res := queries.AtomicPropertiesHashQuery.QueryRow(atomicPropertiesId)
-	if err = res.Scan(&dbHash); err != nil {
+	if err = res.Scan(&dbHash, &refCnt); err != nil {
 		return err
 	}
 	atomicPropHash := HashToHexString(card.AtomicPropertiesHash())
 
 	if dbHash != atomicPropHash {
-		// The atomic properties hash doesn't match, so insert a new atomic properties
-		// record
+		// The atomic properties hash doesn't match.  First, check to see if
+        // this is the last card referring to this atomic properties record.  If it
+        // is, remove the atomic properties before inserting a new one.  If it's not,
+        // just decrement the reference count
+        if refCnt > 1 {
+            // Not the only card referencing this atomic properties record,
+            // so just decrement the reference count
+            _, err := queries.UpdateRefCntQuery.Exec(refCnt - 1, atomicPropertiesId)
+            if err != nil {
+                return err
+            }
+        } else {
+            // No other cards referencing this atomic properties record, so
+            // remove the entire record
+            err := DeleteAtomicPropertiesFromDb(queries, atomicPropertiesId)
+            if err != nil {
+                return err
+            }
+        }
+
+        // Add the new atomic properties record
 		atomicPropertiesId, err = card.InsertAtomicPropertiesToDb(queries, atomicPropHash)
 		if err != nil {
 			return err
@@ -285,6 +309,11 @@ func (card *MTGCard) UpdateCardDataInDb(queries *dbQueries,
 	}
 
 	return nil
+}
+
+func DeleteAtomicPropertiesFromDb(queries *dbQueries, atomicPropertiesId int64) error {
+
+    return nil
 }
 
 func (card *MTGCard) InsertAllCardDataToDb(queries *dbQueries, setId int64) (bool, error) {
