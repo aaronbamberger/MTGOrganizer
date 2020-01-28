@@ -1,617 +1,450 @@
 package mtgcards
 
-import "context"
 import "database/sql"
-import "encoding/hex"
-import "fmt"
-import "hash"
-import "log"
-import "sync"
 
-func checkRowsAffected(res sql.Result, expectedAffected int64, errString string) error {
-	rowsAffected, err := res.RowsAffected()
-	if err != nil {
-		return err
-	}
-
-	if rowsAffected != expectedAffected {
-		return fmt.Errorf("Query %s affected an unexpected number of rows, expected %d, got %d\n",
-			errString, expectedAffected, rowsAffected)
-	}
-
-	return nil
+type dbQueries struct {
+    SetHashQuery *sql.Stmt
+    CardHashQuery *sql.Stmt
+    InsertSetQuery *sql.Stmt
+    UpdateSetQuery *sql.Stmt
+    InsertSetTranslationQuery *sql.Stmt
+	NumAtomicPropertiesQuery *sql.Stmt
+	AtomicPropertiesIdQuery *sql.Stmt
+	AtomicPropertiesHashQuery *sql.Stmt
+	InsertAtomicPropertiesQuery *sql.Stmt
+	InsertCardQuery *sql.Stmt
+	UpdateCardQuery *sql.Stmt
+	InsertAltLangDataQuery *sql.Stmt
+	InsertCardPrintingQuery *sql.Stmt
+	InsertCardSubtypeQuery *sql.Stmt
+	InsertCardSupertypeQuery *sql.Stmt
+	InsertFrameEffectQuery *sql.Stmt
+	InsertLeadershipSkillQuery *sql.Stmt
+	InsertLegalityQuery *sql.Stmt
+	InsertOtherFaceIdQuery *sql.Stmt
+	InsertPurchaseURLQuery *sql.Stmt
+	InsertRulingQuery *sql.Stmt
+	InsertVariationQuery *sql.Stmt
+	InsertBaseTypeQuery *sql.Stmt
+	DeleteFrameEffectQuery *sql.Stmt
+	DeleteOtherFaceQuery *sql.Stmt
+	DeleteVariationQuery *sql.Stmt
+	UpdateRefCntQuery *sql.Stmt
 }
 
-func HashToHexString(hashVal hash.Hash) string {
-	hashBytes := make([]byte, 0, hashVal.Size())
-	hashBytes = hashVal.Sum(hashBytes)
-	return hex.EncodeToString(hashBytes)
+func (queries *dbQueries) queriesForTx(tx *sql.Tx) *dbQueries {
+    var txQueries dbQueries
+    txQueries.SetHashQuery = tx.Stmt(queries.SetHashQuery)
+    txQueries.CardHashQuery = tx.Stmt(queries.CardHashQuery)
+    txQueries.InsertSetQuery = tx.Stmt(queries.InsertSetQuery)
+    txQueries.UpdateSetQuery = tx.Stmt(queries.UpdateSetQuery)
+    txQueries.InsertSetTranslationQuery = tx.Stmt(queries.InsertSetTranslationQuery)
+    txQueries.NumAtomicPropertiesQuery = tx.Stmt(queries.NumAtomicPropertiesQuery)
+    txQueries.AtomicPropertiesIdQuery = tx.Stmt(queries.AtomicPropertiesIdQuery)
+    txQueries.AtomicPropertiesHashQuery = tx.Stmt(queries.AtomicPropertiesHashQuery)
+    txQueries.InsertAtomicPropertiesQuery = tx.Stmt(queries.InsertAtomicPropertiesQuery)
+    txQueries.InsertCardQuery = tx.Stmt(queries.InsertCardQuery)
+    txQueries.UpdateCardQuery = tx.Stmt(queries.UpdateCardQuery)
+    txQueries.InsertAltLangDataQuery = tx.Stmt(queries.InsertAltLangDataQuery)
+    txQueries.InsertCardPrintingQuery = tx.Stmt(queries.InsertCardPrintingQuery)
+    txQueries.InsertCardSubtypeQuery = tx.Stmt(queries.InsertCardSubtypeQuery)
+    txQueries.InsertCardSupertypeQuery = tx.Stmt(queries.InsertCardSupertypeQuery)
+    txQueries.InsertFrameEffectQuery = tx.Stmt(queries.InsertFrameEffectQuery)
+    txQueries.InsertLeadershipSkillQuery = tx.Stmt(queries.InsertLeadershipSkillQuery)
+    txQueries.InsertLegalityQuery = tx.Stmt(queries.InsertLegalityQuery)
+    txQueries.InsertOtherFaceIdQuery = tx.Stmt(queries.InsertOtherFaceIdQuery)
+    txQueries.InsertPurchaseURLQuery = tx.Stmt(queries.InsertPurchaseURLQuery)
+    txQueries.InsertRulingQuery = tx.Stmt(queries.InsertRulingQuery)
+    txQueries.InsertVariationQuery = tx.Stmt(queries.InsertVariationQuery)
+    txQueries.InsertBaseTypeQuery = tx.Stmt(queries.InsertBaseTypeQuery)
+    txQueries.DeleteFrameEffectQuery = tx.Stmt(queries.DeleteFrameEffectQuery)
+    txQueries.DeleteOtherFaceQuery = tx.Stmt(queries.DeleteOtherFaceQuery)
+    txQueries.DeleteVariationQuery = tx.Stmt(queries.DeleteVariationQuery)
+    txQueries.UpdateRefCntQuery = tx.Stmt(queries.UpdateRefCntQuery)
+
+    return &txQueries
 }
 
-func ImportSetsToDb(db *sql.DB, sets map[string]MTGSet) (*DbUpdateStats, error) {
-	var setImportWg sync.WaitGroup
-	var updateStats DbUpdateStats
-
-	// We defer the cleanup before calling the setup function, because the setup
-	// function might get partway through the initialization, and then error out,
-	// leaving some things to be cleaned up.  The cleanup function will only
-	// cleanup things that have been actually set up, so it's safe to call it
-	// regardless of where the setup might fail
-	defer cleanupOptionTables()
-	err := prepareOptionTables(db)
-	if err != nil {
-		return nil, err
-	}
-
-	dbQueries, err  := prepareDbQueries(db)
-	if err != nil {
-		dbQueries.cleanupDbQueries()
-		return nil, err
-	}
-	defer dbQueries.cleanupDbQueries()
-
-	for _, set := range sets {
-		setImportWg.Add(1)
-		go maybeInsertSetToDb(db, dbQueries, &updateStats, &setImportWg, set)
-	}
-
-	setImportWg.Wait()
-	return &updateStats, nil
-}
-
-func maybeInsertSetToDb(db *sql.DB, queries *dbQueries, updateStats *DbUpdateStats,
-		wg *sync.WaitGroup, set MTGSet) {
-	defer wg.Done()
-	ctx := context.Background()
-
-	// Open a DB connection
-	dbConn, err := db.Conn(ctx)
-	if err != nil {
-		log.Print(err)
-		return
-	}
-	defer dbConn.Close()
-
-	// Transaction for inserting the set itself
-	setTx, err := dbConn.BeginTx(ctx, nil)
-	if err != nil {
-		log.Print(err)
-		return
-	}
-
-	setQueries := queries.queriesForTx(setTx)
-
-	// Hash the set for later use
-	set.Canonicalize()
-	setHash := HashToHexString(set.Hash())
-
-	// First, check to see if this set is in the DB at all
-	setExists, setDbHash, setId, err := set.CheckIfSetExists(setQueries)
-	if err != nil {
-		log.Print(err)
-		setTx.Rollback()
-		return
-	}
-
-	updateStats.AddToTotalSets(1)
-
-	totalNewCards := 0
-	totalNewCardsInNewSets := 0
-	totalNewCardsInExistingSets := 0
-	totalNewAtomicCards := 0
-	totalExistingCards := 0
-	totalExistingCardsHashSkipped := 0
-	totalExistingCardsUpdated := 0
-
-	if setExists {
-		log.Printf("Set %s already exists in the database\n", set.Code)
-		updateStats.AddToTotalExistingSets(1)
-		// This set already exists in the db
-		// Check to see if the hash matcdbhes what's already in the db
-		if setDbHash == setHash {
-			// Hashes match, so we can skip updating this set in the db
-			log.Printf("Set %s in db matches hash %s, skipping update...\n", set.Code, setDbHash)
-			updateStats.AddToExistingSetsSkipped(1)
-			setTx.Commit()
-		} else {
-			// Hashes don't match, so we need to first update the set itself, and then
-			// look at each card in the set to see if it needs to be updated
-			log.Printf("Set %s hashes don't match (db: %s, json: %s), updating set...\n",
-				set.Code, setDbHash, setHash)
-			err := set.UpdateSetInDb(setQueries, setHash, setId)
-			if err != nil {
-				log.Print(err)
-				setTx.Rollback()
-				return
-			}
-			updateStats.AddToExistingSetsUpdated(1)
-			setTx.Commit()
-
-			// For each card, check if the card exists, and if so, if the hash
-			// matches
-			for _, card := range set.Cards {
-				// Transaction for each card
-				cardTx, err := dbConn.BeginTx(ctx, nil)
-				if err != nil {
-					log.Print(err)
-					continue
-				}
-
-				cardQueries := queries.queriesForTx(cardTx)
-
-				cardExists, cardDbHash, atomicCardDataId, err := card.CheckIfCardExists(cardQueries)
-				if err != nil {
-					log.Print(err)
-					cardTx.Rollback()
-					continue
-				}
-
-				if !cardExists {
-					newAtomicPropertiesAdded, err := card.InsertAllCardDataToDb(cardQueries, setId)
-					if err != nil {
-						log.Print(err)
-						cardTx.Rollback()
-						continue
-					}
-					if newAtomicPropertiesAdded {
-						totalNewAtomicCards += 1
-					}
-					totalNewCards += 1
-					totalNewCardsInExistingSets += 1
-				} else {
-					totalExistingCards += 1
-					// Check if the stored hash matches
-					cardHash := HashToHexString(card.Hash())
-					if cardHash == cardDbHash {
-						// Can skip
-						log.Printf("Card %s hash matches in db (%s), skipping", card.Name, cardHash)
-						totalExistingCardsHashSkipped += 1
-					} else {
-						// Need to update card
-						log.Printf("Card %s hash doesn't match (db: %s, card: %s), updating",
-							card.Name, cardDbHash, cardHash)
-						totalExistingCardsUpdated += 1
-						err := card.UpdateCardDataInDb(cardQueries, atomicCardDataId, setId)
-						if err != nil {
-							log.Print(err)
-							cardTx.Rollback()
-							continue
-						}
-					}
-				}
-				cardTx.Commit()
-			}
-		}
-	} else {
-		// This set does not already exist in the db
-		setId, err := set.InsertSetToDb(setQueries, setHash)
-		if err != nil {
-			log.Print(err)
-			setTx.Rollback()
-			return
-		}
-		updateStats.AddToTotalNewSets(1)
-
-		// Insert the set translations
-		for lang, name := range set.Translations {
-			err := InsertSetTranslationToDb(setQueries, setId, lang, name)
-			if err != nil {
-				log.Print(err)
-				setTx.Rollback()
-				return
-			}
-		}
-
-		setTx.Commit()
-
-		// Insert all of the cards in the set.  No need to check the full card hash, since we're bulk
-		// inserting the entire set
-		log.Printf("Processing cards in set %s\n", set.Code)
-		for _, card := range set.Cards {
-			// Transaction for each card
-			cardTx, err := dbConn.BeginTx(ctx, nil)
-			if err != nil {
-				log.Print(err)
-				continue
-			}
-
-			cardQueries := queries.queriesForTx(cardTx)
-
-			totalNewCards += 1
-			totalNewCardsInNewSets += 1
-			card.Canonicalize()
-
-			newAtomicPropertiesAdded, err := card.InsertAllCardDataToDb(cardQueries, setId)
-			if err != nil {
-				log.Print(err)
-				cardTx.Rollback()
-				continue
-			}
-			if newAtomicPropertiesAdded {
-				totalNewAtomicCards += 1
-			}
-			cardTx.Commit()
-		}
-	}
-
-	updateStats.AddToTotalCards(totalNewCards)
-	updateStats.AddToTotalNewCards(totalNewCards)
-	updateStats.AddToTotalNewCardsInNewSets(totalNewCardsInNewSets)
-	updateStats.AddToTotalNewCardsInExistingSets(totalNewCardsInExistingSets)
-	updateStats.AddToTotalNewAtomicCards(totalNewAtomicCards)
-	updateStats.AddToTotalExistingCards(totalExistingCards)
-	updateStats.AddToExistingCardsSkipped(totalExistingCardsHashSkipped)
-	updateStats.AddToExistingCardsUpdated(totalExistingCardsUpdated)
-	log.Printf("Done processing set %s\n", set.Code)
-}
-
-func (card *MTGCard) UpdateCardDataInDb(queries *dbQueries,
-		atomicPropertiesId int64, setId int64) (error) {
-	// First, check to see if the atomic properties hash still matches.  If it does,
-	// we just need to update the rest of the card data, and can leave it pointing
-	// to the same atomic properties record.
+func prepareDbQueries(db *sql.DB) (*dbQueries, error) {
 	var err error
-	var dbHash string
-	res := queries.AtomicPropertiesHashQuery.QueryRow(atomicPropertiesId)
-	if err = res.Scan(&dbHash); err != nil {
-		return err
-	}
-	atomicPropHash := HashToHexString(card.AtomicPropertiesHash())
+    var queries dbQueries
 
-	if dbHash != atomicPropHash {
-		// The atomic properties hash doesn't match, so insert a new atomic properties
-		// record
-		atomicPropertiesId, err = card.InsertAtomicPropertiesToDb(queries, atomicPropHash)
-		if err != nil {
-			return err
-		}
-	}
-
-	// Now, update the card record, clear any entries from auxilliary tables belonging
-	// to the old card record, and insert new auxilliary entries for the updated card record
-	err = card.UpdateCardInDb(queries, atomicPropertiesId, setId)
+    queries.SetHashQuery, err = db.Prepare(`SELECT set_hash, set_id FROM sets WHERE code = ?`)
 	if err != nil {
-		return err
+        return &queries, err
 	}
 
-	err = card.DeleteOtherTableCardData(queries)
+	queries.CardHashQuery, err = db.Prepare(`SELECT full_card_hash, atomic_card_data_id
+        FROM all_cards WHERE uuid = ?`)
 	if err != nil {
-		return err
+        return &queries, err
 	}
 
-	err = card.InsertOtherTableCardData(queries)
+	queries.InsertSetQuery, err = db.Prepare(`INSERT INTO sets
+		(set_hash, base_size, block_name, code, is_foreign_only, is_foil_only,
+		is_online_only, is_partial_preview, keyrune_code, mcm_name, mcm_id,
+		mtgo_code, name, parent_code, release_date, tcgplayer_group_id,
+		total_set_size, set_type)
+		VALUES
+		(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
-		return err
+        return &queries, err
 	}
 
-	return nil
+	queries.UpdateSetQuery, err = db.Prepare(`UPDATE sets SET
+		set_hash = ?,
+		base_size = ?,
+		block_name = ?,
+		code = ?,
+		is_foreign_only = ?,
+		is_foil_only = ?,
+		is_online_only = ?,
+		is_partial_preview = ?,
+		keyrune_code = ?,
+		mcm_name = ?,
+		mcm_id = ?,
+		mtgo_code = ?,
+		name = ?,
+		parent_code = ?,
+		release_date = ?,
+		tcgplayer_group_id = ?,
+		total_set_size = ?,
+		set_type = ?
+		WHERE set_id = ?`)
+	if err != nil {
+        return &queries, err
+	}
+
+	queries.InsertSetTranslationQuery, err = db.Prepare(`INSERT INTO set_translations
+		(set_id, set_translation_language_id, set_translated_name)
+		VALUES
+		(?, ?, ?)`)
+	if err != nil {
+		return &queries, err
+	}
+
+	queries.NumAtomicPropertiesQuery, err = db.Prepare(`SELECT COUNT(scryfall_oracle_id)
+		FROM atomic_card_data
+		WHERE card_data_hash = ?`)
+	if err != nil {
+		return &queries, err
+	}
+
+	queries.AtomicPropertiesIdQuery, err = db.Prepare(`SELECT atomic_card_data_id,
+		ref_cnt,
+		scryfall_oracle_id
+		FROM atomic_card_data
+		WHERE card_data_hash = ?`)
+	if err != nil {
+		return &queries, err
+	}
+
+	queries.AtomicPropertiesHashQuery, err = db.Prepare(`SELECT card_data_hash
+		FROM atomic_card_data
+		WHERE atomic_card_data_id = ?`)
+	if err != nil {
+		return &queries, err
+	}
+
+	queries.InsertAtomicPropertiesQuery, err = db.Prepare(`INSERT INTO atomic_card_data
+		(card_data_hash, color_identity, color_indicator, colors, converted_mana_cost,
+		edhrec_rank, face_converted_mana_cost, hand, is_reserved, layout, life,
+		loyalty, mana_cost, mtgstocks_id, name, card_power, scryfall_oracle_id,
+		side, text, toughness, card_type)
+		VALUES
+		(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+	if err != nil {
+		return &queries, err
+	}
+
+	queries.InsertCardQuery, err = db.Prepare(`INSERT INTO all_cards
+		(uuid, full_card_hash, atomic_card_data_id, set_id, artist, border_color,
+		card_number, scryfall_id, watermark, frame_version, mcm_id, mcm_meta_id,
+		multiverse_id, original_text, original_type, rarity, tcgplayer_product_id,
+		duel_deck, flavor_text, has_foil, has_non_foil, is_alternative, is_arena,
+		is_full_art, is_mtgo, is_online_only, is_oversized, is_paper, is_promo,
+		is_reprint, is_starter, is_story_spotlight, is_textless, is_timeshifted,
+		mtg_arena_id, mtgo_foil_id, mtgo_id, scryfall_illustration_id)
+		VALUES
+		(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+		?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+	if err != nil {
+		return &queries, err
+	}
+
+	queries.UpdateCardQuery, err = db.Prepare(`UPDATE all_cards SET
+		full_card_hash = ?,
+		atomic_card_data_id = ?,
+		set_id = ?,
+		artist = ?,
+		border_color = ?,
+		card_number = ?,
+		scryfall_id = ?,
+		watermark = ?,
+		frame_version = ?,
+		mcm_id = ?,
+		mcm_meta_id = ?,
+		multiverse_id = ?,
+		original_text = ?,
+		original_type = ?,
+		rarity = ?,
+		tcgplayer_product_id = ?,
+		duel_deck = ?,
+		flavor_text = ?,
+		has_foil = ?,
+		has_non_foil = ?,
+		is_alternative = ?,
+		is_arena = ?,
+		is_full_art = ?,
+		is_mtgo = ?,
+		is_online_only = ?,
+		is_oversized = ?,
+		is_paper = ?,
+		is_promo = ?,
+		is_reprint = ?,
+		is_starter = ?,
+		is_story_spotlight = ?,
+		is_textless = ?,
+		is_timeshifted = ?,
+		mtg_arena_id = ?,
+		mtgo_foil_id = ?,
+		mtgo_id = ?,
+		scryfall_illustration_id = ?
+		WHERE uuid = ?`)
+    if err != nil {
+        return &queries, err
+    }
+
+	queries.InsertAltLangDataQuery, err = db.Prepare(`INSERT INTO alternate_language_data
+		(atomic_card_data_id, flavor_text, language, multiverse_id, name, text, card_type)
+		VALUES
+		(?, ?, ?, ?, ?, ?, ?)`)
+	if err != nil {
+		return &queries, err
+	}
+
+	queries.InsertCardPrintingQuery, err = db.Prepare(`INSERT INTO card_printings
+		(atomic_card_data_id, set_code)
+		VALUES
+		(?, ?)`)
+	if err != nil {
+		return &queries, err
+	}
+
+	queries.InsertCardSubtypeQuery, err = db.Prepare(`INSERT INTO card_subtypes
+		(atomic_card_data_id, subtype_option_id)
+		VALUES
+		(?, ?)`)
+	if err != nil {
+		return &queries, err
+	}
+
+	queries.InsertCardSupertypeQuery, err = db.Prepare(`INSERT INTO card_supertypes
+		(atomic_card_data_id, supertype_option_id)
+		VALUES
+		(?, ?)`)
+	if err != nil {
+		return &queries, err
+	}
+
+	queries.InsertFrameEffectQuery, err = db.Prepare(`INSERT INTO frame_effects
+		(card_uuid, frame_effect_option_id)
+		VALUES
+		(?, ?)`)
+	if err != nil {
+		return &queries, err
+	}
+
+	queries.InsertLeadershipSkillQuery, err = db.Prepare(`INSERT INTO leadership_skills
+		(atomic_card_data_id, leadership_format_id, leader_legal)
+		VALUES
+		(?, ?, ?)`)
+	if err != nil {
+		return &queries, err
+	}
+
+	queries.InsertLegalityQuery, err = db.Prepare(`INSERT INTO legalities
+		(atomic_card_data_id, game_format_id, legality_option_id)
+		VALUES
+		(?, ?, ?)`)
+	if err != nil {
+		return &queries, err
+	}
+
+	queries.InsertOtherFaceIdQuery, err = db.Prepare(`INSERT INTO other_faces
+		(card_uuid, other_face_uuid)
+		VALUES
+		(?, ?)`)
+	if err != nil {
+		return &queries, err
+	}
+
+	queries.InsertPurchaseURLQuery, err = db.Prepare(`INSERT INTO purchase_urls
+		(atomic_card_data_id, purchase_site_id, purchase_url)
+		VALUES
+		(?, ?, ?)`)
+	if err != nil {
+		return &queries, err
+	}
+
+	queries.InsertRulingQuery, err = db.Prepare(`INSERT INTO rulings
+		(atomic_card_data_id, ruling_date, ruling_text)
+		VALUES
+		(?, ?, ?)`)
+	if err != nil {
+		return &queries, err
+	}
+
+	queries.InsertVariationQuery, err = db.Prepare(`INSERT INTO variations
+		(card_uuid, variation_uuid)
+		VALUES
+		(?, ?)`)
+	if err != nil {
+		return &queries, err
+	}
+
+	queries.InsertBaseTypeQuery, err = db.Prepare(`INSERT INTO base_types
+		(atomic_card_data_id, base_type_option_id)
+		VALUES
+		(?, ?)`)
+	if err != nil {
+		return &queries, err
+	}
+
+	queries.DeleteFrameEffectQuery, err = db.Prepare(`DELETE FROM frame_effects
+		WHERE card_uuid = ?`)
+	if err != nil {
+		return &queries, err
+	}
+
+	queries.DeleteOtherFaceQuery, err = db.Prepare(`DELETE FROM other_faces
+		WHERE card_uuid = ?`)
+	if err != nil {
+		return &queries, err
+	}
+
+	queries.DeleteVariationQuery, err = db.Prepare(`DELETE FROM variations
+		WHERE card_uuid = ?`)
+	if err != nil {
+		return &queries, err
+	}
+
+	queries.UpdateRefCntQuery, err = db.Prepare(`UPDATE atomic_card_data
+		SET ref_cnt = ?
+		WHERE atomic_card_data_id = ?`)
+    if err != nil {
+        return &queries, nil
+    }
+
+	return &queries, nil
 }
 
-func (card *MTGCard) InsertAllCardDataToDb(queries *dbQueries, setId int64) (bool, error) {
-	newAtomicPropertiesAdded := false
+func (queries *dbQueries) cleanupDbQueries() {
+    if queries.SetHashQuery != nil {
+        queries.SetHashQuery.Close()
+    }
 
-	// First, calculate the atomic properties hash, so we can see if this card
-	// shares its atomic properties with an existing card in the db
-	atomicPropHash := HashToHexString(card.AtomicPropertiesHash())
-	atomicPropId, refCnt, exists, err := card.GetAtomicPropertiesId(queries, atomicPropHash)
-	if err != nil {
-		return false, err
+    if queries.CardHashQuery != nil {
+        queries.CardHashQuery.Close()
+    }
+
+    if queries.InsertSetQuery != nil {
+        queries.InsertSetQuery.Close()
+    }
+
+    if queries.UpdateSetQuery != nil {
+        queries.UpdateSetQuery.Close()
+    }
+
+    if queries.InsertSetTranslationQuery != nil {
+        queries.InsertSetTranslationQuery.Close()
+    }
+
+	if queries.NumAtomicPropertiesQuery != nil {
+		queries.NumAtomicPropertiesQuery.Close()
 	}
 
-	if !exists {
-		// If the atomic properties don't exist already, we need to insert
-		// a new record
-		atomicPropId, err = card.InsertAtomicPropertiesToDb(queries, atomicPropHash)
-		if err != nil {
-			return false, err
-		}
-		newAtomicPropertiesAdded = true
-	} else {
-		// Otherwise, update the reference count of this atomic properties record
-		_, err := queries.UpdateRefCntQuery.Exec(refCnt + 1, atomicPropId)
-		if err != nil {
-			return false, err
-		}
+	if queries.AtomicPropertiesIdQuery != nil {
+		queries.AtomicPropertiesIdQuery.Close()
 	}
 
-	// Insert the main card record in the all_cards table
-	err = card.InsertCardToDb(queries, atomicPropId, setId)
-	if err != nil {
-		return false, err
+	if queries.AtomicPropertiesHashQuery != nil {
+		queries.AtomicPropertiesHashQuery.Close()
 	}
 
-	// Insert the rest of the card data
-	err = card.InsertOtherTableCardData(queries)
-	if err != nil {
-		return false, nil
+	if queries.InsertAtomicPropertiesQuery != nil {
+		queries.InsertAtomicPropertiesQuery.Close()
 	}
 
-	return newAtomicPropertiesAdded, nil
-}
-
-func (card *MTGCard) InsertOtherTableCardData(queries *dbQueries) error {
-	// Insert the card data that doesn't live in the all_cards table
-
-	// Frame effects
-	for _, frameEffect := range card.FrameEffects {
-		err := card.InsertFrameEffectToDb(queries, frameEffect)
-		if err != nil {
-			return err
-		}
+	if queries.InsertCardQuery != nil {
+		queries.InsertCardQuery.Close()
 	}
 
-	// Other face IDs
-	for _, otherFaceId := range card.OtherFaceIds {
-		err := card.InsertOtherFaceIdToDb(queries, otherFaceId)
-		if err != nil {
-			return err
-		}
+	if queries.UpdateCardQuery != nil {
+		queries.UpdateCardQuery.Close()
 	}
 
-	// Variations
-	for _, variation := range card.Variations {
-		err := card.InsertVariationToDb(queries, variation)
-		if err != nil {
-			return err
-		}
+	if queries.InsertAltLangDataQuery != nil {
+		queries.InsertAltLangDataQuery.Close()
 	}
 
-	return nil
-}
-
-func (card *MTGCard) DeleteOtherTableCardData(queries *dbQueries) error {
-	_, err := queries.DeleteFrameEffectQuery.Exec(card.UUID)
-	if err != nil {
-		return err
+	if queries.InsertCardPrintingQuery != nil {
+		queries.InsertCardPrintingQuery.Close()
 	}
 
-	_, err = queries.DeleteOtherFaceQuery.Exec(card.UUID)
-	if err != nil {
-		return err
+	if queries.InsertCardSubtypeQuery != nil {
+		queries.InsertCardSubtypeQuery.Close()
 	}
 
-	_, err = queries.DeleteVariationQuery.Exec(card.UUID)
-	if err != nil {
-		return err
+	if queries.InsertCardSupertypeQuery != nil {
+		queries.InsertCardSupertypeQuery.Close()
 	}
 
-	return nil
-}
-
-func (card *MTGCard) CheckIfCardExists(queries *dbQueries) (bool, string, int64, error) {
-	resultRow := queries.CardHashQuery.QueryRow(card.UUID)
-
-	var cardHash string
-	var atomicCardDataId int64
-	err := resultRow.Scan(&cardHash, &atomicCardDataId)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			// This card isn't in the database
-			return false, "", 0, nil
-		} else {
-			return false, "", 0, err
-		}
-	} else {
-		return true, cardHash, atomicCardDataId, nil
+	if queries.InsertFrameEffectQuery != nil {
+		queries.InsertFrameEffectQuery.Close()
 	}
-}
 
-func (set *MTGSet) CheckIfSetExists(queries *dbQueries) (bool, string, int64, error) {
-	resultRow := queries.SetHashQuery.QueryRow(set.Code)
+	if queries.InsertLeadershipSkillQuery != nil {
+		queries.InsertLeadershipSkillQuery.Close()
+	}
 
-	var setHash string
-	var setId int64
-	err := resultRow.Scan(&setHash, &setId)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			// This set isn't in the database
-			return false, "", 0, nil
-		} else {
-			return false, "", 0, err
-		}
-	} else {
-		return true, setHash, setId, nil
+	if queries.InsertLegalityQuery != nil {
+		queries.InsertLegalityQuery.Close()
+	}
+
+	if queries.InsertOtherFaceIdQuery != nil {
+		queries.InsertOtherFaceIdQuery.Close()
+	}
+
+	if queries.InsertPurchaseURLQuery != nil {
+		queries.InsertPurchaseURLQuery.Close()
+	}
+
+	if queries.InsertRulingQuery != nil {
+		queries.InsertRulingQuery.Close()
+	}
+
+	if queries.InsertVariationQuery != nil {
+		queries.InsertVariationQuery.Close()
+	}
+
+	if queries.InsertBaseTypeQuery != nil {
+		queries.InsertBaseTypeQuery.Close()
+	}
+
+	if queries.DeleteFrameEffectQuery != nil {
+		queries.DeleteFrameEffectQuery.Close()
+	}
+
+	if queries.DeleteOtherFaceQuery != nil {
+		queries.DeleteOtherFaceQuery.Close()
+	}
+
+	if queries.DeleteVariationQuery != nil {
+		queries.DeleteVariationQuery.Close()
+	}
+
+	if queries.UpdateRefCntQuery != nil {
+		queries.UpdateRefCntQuery.Close()
 	}
 }
-
-func (set *MTGSet) InsertSetToDb(queries *dbQueries, setHash string) (int64, error) {
-	res, err := queries.InsertSetQuery.Exec(setHash, set.BaseSetSize, set.Block,
-		set.Code, set.IsForeignOnly, set.IsFoilOnly, set.IsOnlineOnly,
-		set.IsPartialPreview, set.KeyruneCode, set.MCMName, set.MCMId, set.MTGOCode,
-		set.Name, set.ParentCode, set.ReleaseDate, set.TCGPlayerGroupId,
-		set.TotalSetSize, set.Type)
-	if err != nil {
-		return 0, err
-	}
-
-	err = checkRowsAffected(res, 1, "insert set")
-	if err != nil {
-		return 0, err
-	}
-
-	setId, err := res.LastInsertId()
-	if err != nil {
-		return 0, err
-	}
-
-	return setId, nil
-}
-
-func (set *MTGSet) UpdateSetInDb(queries *dbQueries, setHash string, setId int64) error {
-	res, err := queries.UpdateSetQuery.Exec(setHash, set.BaseSetSize, set.Block,
-		set.Code, set.IsForeignOnly, set.IsFoilOnly, set.IsOnlineOnly,
-		set.IsPartialPreview, set.KeyruneCode, set.MCMName, set.MCMId, set.MTGOCode,
-		set.Name, set.ParentCode, set.ReleaseDate, set.TCGPlayerGroupId,
-		set.TotalSetSize, set.Type, setId)
-	if err != nil {
-		return err
-	}
-
-	return checkRowsAffected(res, 1, "update set")
-}
-
-func InsertSetTranslationToDb(queries *dbQueries, setId int64, translationLang string,
-		translatedName string) error {
-	languageId, err := getSetTranslationLanguageId(translationLang)
-	if err != nil {
-		return err
-	}
-
-	res, err := queries.InsertSetTranslationQuery.Exec(setId, languageId, translatedName)
-	if err != nil {
-		return err
-	}
-
-	return checkRowsAffected(res, 1, "insert set name translation")
-}
-
-func (card *MTGCard) InsertFrameEffectToDb(queries *dbQueries, frameEffect string) error {
-	frameEffectId, err := getFrameEffectId(frameEffect)
-	if err != nil {
-		return err
-	}
-
-	res, err := queries.InsertFrameEffectQuery.Exec(card.UUID, frameEffectId)
-	if err != nil {
-		return err
-	}
-
-	return checkRowsAffected(res, 1, "insert frame effect")
-}
-
-func (card *MTGCard) InsertOtherFaceIdToDb(queries *dbQueries, otherFaceUUID string) error {
-	res, err := queries.InsertOtherFaceIdQuery.Exec(card.UUID, otherFaceUUID)
-	if err != nil {
-		return err
-	}
-
-	return checkRowsAffected(res, 1, "insert other face ID")
-}
-
-func (card *MTGCard) InsertVariationToDb(queries *dbQueries, variationUUID string) error {
-	res, err := queries.InsertVariationQuery.Exec(card.UUID, variationUUID)
-	if err != nil {
-		return err
-	}
-
-	return checkRowsAffected(res, 1, "insert variation")
-}
-
-func (card *MTGCard) InsertCardToDb(queries *dbQueries, atomicPropertiesId int64,
-		setId int64) error {
-	var duelDeck sql.NullString
-	var flavorText sql.NullString
-	var mtgArenaId sql.NullInt32
-	var mtgoFoilId sql.NullInt32
-	var mtgoId sql.NullInt32
-	var scryfallIllustrationId sql.NullString
-
-	if len(card.DuelDeck) > 0 {
-		duelDeck.String = card.DuelDeck
-		duelDeck.Valid = true
-	}
-
-	if len(card.FlavorText) > 0 {
-		flavorText.String = card.FlavorText
-		flavorText.Valid = true
-	}
-
-	if card.MTGArenaId > 0 {
-		mtgArenaId.Int32 = int32(card.MTGArenaId)
-		mtgArenaId.Valid = true
-	}
-
-	if card.MTGOFoilId > 0 {
-		mtgoFoilId.Int32 = int32(card.MTGOFoilId)
-		mtgoFoilId.Valid = true
-	}
-
-	if card.MTGOId > 0 {
-		mtgoId.Int32 = int32(card.MTGOId)
-		mtgoId.Valid = true
-	}
-
-	if len(card.ScryfallIllustrationId) > 0 {
-		scryfallIllustrationId.String = card.ScryfallIllustrationId
-		scryfallIllustrationId.Valid = true
-	}
-
-	cardHash := HashToHexString(card.Hash())
-
-	res, err := queries.InsertCardQuery.Exec(card.UUID, cardHash, atomicPropertiesId,
-		setId, card.Artist, card.BorderColor, card.Number, card.ScryfallId,
-		card.Watermark, card.FrameVersion, card.MCMId, card.MCMMetaId,
-		card.MultiverseId, card.OriginalText, card.OriginalType,
-		card.Rarity, card.TCGPlayerProductId, duelDeck, flavorText,
-		card.HasFoil, card.HasNonFoil, card.IsAlternative, card.IsArena,
-		card.IsFullArt, card.IsMTGO, card.IsOnlineOnly, card.IsOversized,
-		card.IsPaper, card.IsPromo, card.IsReprint, card.IsStarter,
-		card.IsStorySpotlight, card.IsTextless, card.IsTimeshifted,
-		mtgArenaId, mtgoFoilId, mtgoId, scryfallIllustrationId)
-
-	if err != nil {
-		return err
-	}
-
-	return checkRowsAffected(res, 1, "insert card data")
-}
-
-func (card *MTGCard) UpdateCardInDb(queries *dbQueries, atomicPropertiesId int64,
-		setId int64) error {
-	var duelDeck sql.NullString
-	var flavorText sql.NullString
-	var mtgArenaId sql.NullInt32
-	var mtgoFoilId sql.NullInt32
-	var mtgoId sql.NullInt32
-	var scryfallIllustrationId sql.NullString
-
-	if len(card.DuelDeck) > 0 {
-		duelDeck.String = card.DuelDeck
-		duelDeck.Valid = true
-	}
-
-	if len(card.FlavorText) > 0 {
-		flavorText.String = card.FlavorText
-		flavorText.Valid = true
-	}
-
-	if card.MTGArenaId > 0 {
-		mtgArenaId.Int32 = int32(card.MTGArenaId)
-		mtgArenaId.Valid = true
-	}
-
-	if card.MTGOFoilId > 0 {
-		mtgoFoilId.Int32 = int32(card.MTGOFoilId)
-		mtgoFoilId.Valid = true
-	}
-
-	if card.MTGOId > 0 {
-		mtgoId.Int32 = int32(card.MTGOId)
-		mtgoId.Valid = true
-	}
-
-	if len(card.ScryfallIllustrationId) > 0 {
-		scryfallIllustrationId.String = card.ScryfallIllustrationId
-		scryfallIllustrationId.Valid = true
-	}
-
-	cardHash := HashToHexString(card.Hash())
-
-	res, err := queries.UpdateCardQuery.Exec(cardHash, atomicPropertiesId,
-		setId, card.Artist, card.BorderColor, card.Number, card.ScryfallId,
-		card.Watermark, card.FrameVersion, card.MCMId, card.MCMMetaId,
-		card.MultiverseId, card.OriginalText, card.OriginalType,
-		card.Rarity, card.TCGPlayerProductId, duelDeck, flavorText,
-		card.HasFoil, card.HasNonFoil, card.IsAlternative, card.IsArena,
-		card.IsFullArt, card.IsMTGO, card.IsOnlineOnly, card.IsOversized,
-		card.IsPaper, card.IsPromo, card.IsReprint, card.IsStarter,
-		card.IsStorySpotlight, card.IsTextless, card.IsTimeshifted,
-		mtgArenaId, mtgoFoilId, mtgoId, scryfallIllustrationId, card.UUID)
-
-	if err != nil {
-		return err
-	}
-
-	return checkRowsAffected(res, 1, "update card data")
-}
-
