@@ -5,21 +5,31 @@ import "sync"
 type DbUpdateStats struct {
 	mutex sync.RWMutex
 
+    // Stats about sets in the update
 	totalSets int
-	totalNewSets int
-	totalExistingSets int
 
+    // Stats about new sets in the update
+	totalNewSets int
+
+    // Stats about existing sets in the update
+	totalExistingSets int
 	existingSetsSkipped int
 	existingSetsUpdated int
 
+    // Stats about cards in the update
 	totalCards int
-	totalNewCards int
-	totalNewAtomicCards int
-    totalExistingCards int
 
+    // Stats about new cards in the update
+	totalNewCards int
+	totalNewAtomicRecordsForNewCards int
+    totalExistingAtomicRecordsForNewCards int
 	totalNewCardsInNewSets int
 	totalNewCardsInExistingSets int
 
+    // Stats about existing cards in the update
+    totalExistingCards int
+    totalNewAtomicRecordsForExistingCards int
+    totalExistingAtomicRecordsForExistingCards int
 	existingCardsSkipped int
 	existingCardsUpdated int
 }
@@ -66,10 +76,28 @@ func (stats *DbUpdateStats) AddToTotalNewCards(delta int) {
     stats.totalNewCards += delta
 }
 
-func (stats *DbUpdateStats) AddToTotalNewAtomicCards(delta int) {
+func (stats *DbUpdateStats) AddToTotalNewAtomicRecordsForNewCards(delta int) {
     stats.mutex.Lock()
     defer stats.mutex.Unlock()
-    stats.totalNewAtomicCards += delta
+    stats.totalNewAtomicRecordsForNewCards += delta
+}
+
+func (stats *DbUpdateStats) AddToTotalExistingAtomicRecordsForNewCards(delta int) {
+    stats.mutex.Lock()
+    defer stats.mutex.Unlock()
+    stats.totalExistingAtomicRecordsForNewCards += delta
+}
+
+func (stats *DbUpdateStats) AddToTotalNewAtomicRecordsForExistingCards(delta int) {
+    stats.mutex.Lock()
+    defer stats.mutex.Unlock()
+    stats.totalNewAtomicRecordsForExistingCards += delta
+}
+
+func (stats *DbUpdateStats) AddToTotalExistingAtomicRecordsForExistingCards(delta int) {
+    stats.mutex.Lock()
+    defer stats.mutex.Unlock()
+    stats.totalExistingAtomicRecordsForExistingCards += delta
 }
 
 func (stats *DbUpdateStats) AddToTotalExistingCards(delta int) {
@@ -144,10 +172,28 @@ func (stats *DbUpdateStats) TotalNewCards() int {
     return stats.totalNewCards
 }
 
-func (stats *DbUpdateStats) TotalNewAtomicCards() int {
+func (stats *DbUpdateStats) TotalNewAtomicRecordsForNewCards() int {
     stats.mutex.RLock()
     defer stats.mutex.RUnlock()
-    return stats.totalNewAtomicCards
+    return stats.totalNewAtomicRecordsForNewCards
+}
+
+func (stats *DbUpdateStats) TotalExistingAtomicRecordsForNewCards() int {
+    stats.mutex.RLock()
+    defer stats.mutex.RUnlock()
+    return stats.totalExistingAtomicRecordsForNewCards
+}
+
+func (stats *DbUpdateStats) TotalNewAtomicRecordsForExistingCards() int {
+    stats.mutex.RLock()
+    defer stats.mutex.RUnlock()
+    return stats.totalNewAtomicRecordsForExistingCards
+}
+
+func (stats *DbUpdateStats) TotalExistingAtomicRecordsForExistingCards() int {
+    stats.mutex.RLock()
+    defer stats.mutex.RUnlock()
+    return stats.totalExistingAtomicRecordsForExistingCards
 }
 
 func (stats *DbUpdateStats) TotalExistingCards() int {

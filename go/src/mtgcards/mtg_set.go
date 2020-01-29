@@ -74,7 +74,9 @@ func (set *MTGSet) Hash() hash.Hash {
 
 func (set *MTGSet) Canonicalize() {
 	sort.Sort(ByUUID(set.Cards))
-	for _, card := range set.Cards {
-		card.Canonicalize()
+	for idx := range set.Cards {
+        // Need to access by index here so we're updating the cards
+        // themselves, not copies
+		set.Cards[idx].Canonicalize()
 	}
 }

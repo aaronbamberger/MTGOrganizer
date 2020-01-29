@@ -119,55 +119,43 @@ type MTGCard struct {
 
 }
 
-func (card *MTGCardCommon) AtomicPropertiesHash() hash.Hash {
-	hash := fnv.New128a()
-	for _, colorIdentity := range card.ColorIdentity {
-		hash.Write([]byte(colorIdentity))
-	}
-	for _, color := range card.Colors {
-		hash.Write([]byte(color))
-	}
-	hash.Write([]byte(card.Layout))
-	hash.Write([]byte(card.Power))
-	hash.Write([]byte(card.ScryfallOracleId))
-	for _, subtype := range card.Subtypes {
-		hash.Write([]byte(subtype))
-	}
-	for _, supertype := range card.Supertypes {
-		hash.Write([]byte(supertype))
-	}
-	hash.Write([]byte(card.Text))
-	hash.Write([]byte(card.Toughness))
-	hash.Write([]byte(card.Type))
-	for _, cardType := range card.Types {
-		hash.Write([]byte(cardType))
-	}
-	for _, colorIndicator := range card.ColorIndicator {
-		hash.Write([]byte(colorIndicator))
-	}
-	hash.Write([]byte(card.Loyalty))
-	hash.Write([]byte(card.Name))
-	for _, name := range card.Names {
-		hash.Write([]byte(name))
-	}
-	hash.Write([]byte(card.Side))
-
-	return hash
-}
-
-func (card *MTGCardCommon) Canonicalize() {
-	sort.Strings(card.ColorIdentity)
-	sort.Strings(card.Colors)
-	sort.Strings(card.Subtypes)
-	sort.Strings(card.Supertypes)
-	sort.Strings(card.Types)
-	sort.Strings(card.ColorIndicator)
-	sort.Strings(card.Names)
-}
-
 func (card *MTGCard) AtomicPropertiesHash() hash.Hash {
 	if !card.atomicPropertiesHashValid {
-		card.atomicPropertiesHash = card.MTGCardCommon.AtomicPropertiesHash()
+        card.atomicPropertiesHash = fnv.New128a()
+
+        // Start with the common atomic card properties
+        for _, colorIdentity := range card.ColorIdentity {
+            card.atomicPropertiesHash.Write([]byte(colorIdentity))
+        }
+        for _, color := range card.Colors {
+            card.atomicPropertiesHash.Write([]byte(color))
+        }
+        card.atomicPropertiesHash.Write([]byte(card.Layout))
+        card.atomicPropertiesHash.Write([]byte(card.Power))
+        card.atomicPropertiesHash.Write([]byte(card.ScryfallOracleId))
+        for _, subtype := range card.Subtypes {
+            card.atomicPropertiesHash.Write([]byte(subtype))
+        }
+        for _, supertype := range card.Supertypes {
+            card.atomicPropertiesHash.Write([]byte(supertype))
+        }
+        card.atomicPropertiesHash.Write([]byte(card.Text))
+        card.atomicPropertiesHash.Write([]byte(card.Toughness))
+        card.atomicPropertiesHash.Write([]byte(card.Type))
+        for _, cardType := range card.Types {
+            card.atomicPropertiesHash.Write([]byte(cardType))
+        }
+        for _, colorIndicator := range card.ColorIndicator {
+            card.atomicPropertiesHash.Write([]byte(colorIndicator))
+        }
+        card.atomicPropertiesHash.Write([]byte(card.Loyalty))
+        card.atomicPropertiesHash.Write([]byte(card.Name))
+        for _, name := range card.Names {
+            card.atomicPropertiesHash.Write([]byte(name))
+        }
+        card.atomicPropertiesHash.Write([]byte(card.Side))
+
+        // Next, do the rest of the atomic card properties
 		binary.Write(card.atomicPropertiesHash, binary.BigEndian, card.ConvertedManaCost)
 		binary.Write(card.atomicPropertiesHash, binary.BigEndian, card.FaceConvertedManaCost)
 		for _, languageData := range card.AlternateLanguageData {
@@ -242,7 +230,11 @@ func (card *MTGCard) AtomicPropertiesHash() hash.Hash {
 func (card *MTGCard) Hash() hash.Hash {
 	if !card.hashValid {
 		// Start with the hash of the atomic properties
-		card.hash = card.AtomicPropertiesHash()
+        card.hash = fnv.New128a()
+        atomicPropertiesHash := card.AtomicPropertiesHash()
+        atomicPropertiesHashBytes := make([]byte, 0, atomicPropertiesHash.Size())
+        atomicPropertiesHashBytes = atomicPropertiesHash.Sum(atomicPropertiesHashBytes)
+        card.hash.Write(atomicPropertiesHashBytes)
 
 		// Next do the card common properties
 		card.hash.Write([]byte(card.Artist))
@@ -300,7 +292,13 @@ func (card *MTGCard) Hash() hash.Hash {
 }
 
 func (card *MTGCard) Canonicalize() {
-	card.MTGCardCommon.Canonicalize()
+    sort.Strings(card.ColorIdentity)
+	sort.Strings(card.Colors)
+	sort.Strings(card.Subtypes)
+	sort.Strings(card.Supertypes)
+	sort.Strings(card.Types)
+	sort.Strings(card.ColorIndicator)
+	sort.Strings(card.Names)
 	sort.Sort(ByLanguage(card.AlternateLanguageData))
 	sort.Strings(card.Printings)
 	sort.Sort(ByDate(card.Rulings))
