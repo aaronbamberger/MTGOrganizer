@@ -50,17 +50,38 @@ func ImportSetsToDb(db *sql.DB, sets map[string]MTGSet) (*DbUpdateStats, error) 
 	}
 	defer dbQueries.cleanupDbQueries()
 
+    // Create the thread that serializes all access to the atomic_card_data
+    // db table
+    atomicPropertiesRequest := make(chan atomicPropRequest)
+    resChannel := make(chan error)
+    quitChannel := make(chan interface{})
+    go atomicPropDbThread(db, atomicPropertiesRequest, resChannel, quitChannel)
+
+    err = <-resChannel
+    if err != nil {
+        quitChannel <- nil
+        <-resChannel
+        return nil, err
+    }
+
 	for _, set := range sets {
 		setImportWg.Add(1)
-		go maybeInsertSetToDb(db, dbQueries, &stats, &setImportWg, set)
+		go maybeInsertSetToDb(db, dbQueries, &stats, &setImportWg, atomicPropertiesRequest, set)
 	}
 
 	setImportWg.Wait()
+    quitChannel <- nil
+    <-resChannel
 	return &stats, nil
 }
 
-func maybeInsertSetToDb(db *sql.DB, queries *dbQueries, stats *DbUpdateStats,
-		wg *sync.WaitGroup, set MTGSet) {
+func maybeInsertSetToDb(
+        db *sql.DB,
+        queries *dbQueries,
+        stats *DbUpdateStats,
+		wg *sync.WaitGroup,
+        atomicPropertiesRequest chan atomicPropRequest,
+        set MTGSet) {
 	defer wg.Done()
 	ctx := context.Background()
 
@@ -154,7 +175,10 @@ func maybeInsertSetToDb(db *sql.DB, queries *dbQueries, stats *DbUpdateStats,
 				}
 
 				if !cardExists {
-					newAtomicPropertiesAdded, err := card.InsertAllCardDataToDb(cardQueries, setId)
+					newAtomicPropertiesAdded, err := card.InsertAllCardDataToDb(
+                        cardQueries,
+                        setId,
+                        atomicPropertiesRequest)
 					if err != nil {
 						log.Print(err)
 						cardTx.Rollback()
@@ -183,8 +207,11 @@ func maybeInsertSetToDb(db *sql.DB, queries *dbQueries, stats *DbUpdateStats,
 						// Need to update card
 						log.Printf("Card %s hash doesn't match (db: %s, card: %s), updating",
 							card.Name, cardDbHash, cardHash)
-						newAtomicPropetiesAdded, err := card.UpdateCardDataInDb(cardQueries,
-                            atomicCardDataId, setId)
+						newAtomicPropetiesAdded, err := card.UpdateCardDataInDb(
+                            cardQueries,
+                            atomicCardDataId,
+                            setId,
+                            atomicPropertiesRequest)
 						if err != nil {
 							log.Print(err)
 							cardTx.Rollback()
@@ -243,7 +270,10 @@ func maybeInsertSetToDb(db *sql.DB, queries *dbQueries, stats *DbUpdateStats,
 
 			cardQueries := queries.queriesForTx(cardTx)
 
-			newAtomicPropertiesAdded, err := card.InsertAllCardDataToDb(cardQueries, setId)
+			newAtomicPropertiesAdded, err := card.InsertAllCardDataToDb(
+                cardQueries,
+                setId,
+                atomicPropertiesRequest)
 			if err != nil {
 				log.Print(err)
 				cardTx.Rollback()
@@ -276,55 +306,79 @@ func maybeInsertSetToDb(db *sql.DB, queries *dbQueries, stats *DbUpdateStats,
 	log.Printf("Done processing set %s\n", set.Code)
 }
 
-func (card *MTGCard) UpdateCardDataInDb(queries *dbQueries,
-		atomicPropertiesId int64, setId int64) (bool, error) {
+func (card *MTGCard) UpdateCardDataInDb(
+    queries *dbQueries,
+	atomicPropertiesId int64,
+    setId int64,
+    atomicPropertiesRequest chan atomicPropRequest) (bool, error) {
 	// First, check to see if the atomic properties hash still matches.  If it does,
 	// we just need to update the rest of the card data, and can leave it pointing
 	// to the same atomic properties record.
-	var err error
-	var dbHash string
-    var refCnt int
-	res := queries.AtomicPropertiesHashQuery.QueryRow(atomicPropertiesId)
-	if err = res.Scan(&dbHash, &refCnt); err != nil {
-		return false, err
-	}
-	atomicPropHash := HashToHexString(card.AtomicPropertiesHash())
+    atomicPropHash := HashToHexString(card.AtomicPropertiesHash())
+    responseChan := make(chan atomicPropResponse)
 
-    newAtomicPropertiesAdded := false
+    request := atomicPropRequest{
+        RequestType: AtomicPropRequestGetHash,
+        ResponseChan: responseChan,
+        AtomicPropertiesId: atomicPropertiesId}
+    atomicPropertiesRequest <- request
+    response := <-responseChan
 
-	if dbHash != atomicPropHash {
-		// The atomic properties hash doesn't match.  First, check to see if
-        // this is the last card referring to this atomic properties record.  If it
-        // is, remove the atomic properties before inserting a new one.  If it's not,
-        // just decrement the reference count
-        if refCnt > 1 {
-            // Not the only card referencing this atomic properties record,
-            // so just decrement the reference count
-            _, err := queries.UpdateRefCntQuery.Exec(refCnt - 1, atomicPropertiesId)
-            if err != nil {
-                return false, err
-            }
-        } else {
-            // No other cards referencing this atomic properties record, so
-            // remove the entire record
-            err := DeleteAtomicPropertiesFromDb(queries, atomicPropertiesId)
-            if err != nil {
-                return false, err
-            }
+    if response.Error != nil {
+        return false, response.Error
+    }
+
+    if atomicPropHash != response.AtomicPropertiesHash {
+        // The atomic properties don't match, so release our reference to the old
+        // atomic properties and grab a reference to the new atomic properties
+        request = atomicPropRequest{
+            RequestType: AtomicPropRequestRemoveRef,
+            ResponseChan: responseChan,
+            AtomicPropertiesId: atomicPropertiesId}
+        atomicPropertiesRequest <- request
+        response = <-responseChan
+
+        if response.Error != nil {
+            return false, response.Error
         }
 
-        // Add the new atomic properties record
-		atomicPropertiesId, err = card.InsertAtomicPropertiesToDb(queries, atomicPropHash)
-		if err != nil {
-			return false, err
-		}
+        request = atomicPropRequest{
+            RequestType: AtomicPropRequestGetRef,
+            AtomicPropertiesHash: atomicPropHash,
+            ColorIdentity: card.ColorIdentity,
+            ColorIndicator: card.ColorIndicator,
+            Colors: card.Colors,
+            ConvertedManaCost: card.ConvertedManaCost,
+            EDHRecRank: card.EDHRecRank,
+            FaceConvertedManaCost: card.FaceConvertedManaCost,
+            Hand: card.Hand,
+            IsReserved: card.IsReserved,
+            Layout: card.Layout,
+            Life: card.Life,
+            Loyalty: card.Loyalty,
+            ManaCost: card.ManaCost,
+            MTGStocksId: card.MTGStocksId,
+            Name: card.Name,
+            Power: card.Power,
+            ScryfallOracleId: card.ScryfallOracleId,
+            Side: card.Side,
+            Text: card.Text,
+            Toughness: card.Toughness,
+            Type: card.Type,
+            ResponseChan: responseChan}
+        atomicPropertiesRequest <- request
+        response = <-responseChan
 
-        newAtomicPropertiesAdded = true
-	}
+        if response.Error != nil {
+            return false, response.Error
+        }
+
+        atomicPropertiesId = response.AtomicPropertiesId
+    }
 
 	// Now, update the card record, clear any entries from auxilliary tables belonging
 	// to the old card record, and insert new auxilliary entries for the updated card record
-	err = card.UpdateCardInDb(queries, atomicPropertiesId, setId)
+    err := card.UpdateCardInDb(queries, atomicPropertiesId, setId)
 	if err != nil {
 		return false, err
 	}
@@ -339,47 +393,56 @@ func (card *MTGCard) UpdateCardDataInDb(queries *dbQueries,
 		return false, err
 	}
 
-	return newAtomicPropertiesAdded, nil
+	return response.NewRecordAdded, nil
 }
 
-func DeleteAtomicPropertiesFromDb(queries *dbQueries, atomicPropertiesId int64) error {
-    res, err := queries.DeleteAtomicPropertiesQuery.Exec(atomicPropertiesId)
+func (card *MTGCard) InsertAllCardDataToDb(
+        queries *dbQueries,
+        setId int64,
+        atomicPropertiesRequest chan atomicPropRequest) (bool, error) {
+
+    // Get a reference to an atomic card properties record for this card
+	atomicPropHash := HashToHexString(card.AtomicPropertiesHash())
+    responseChan := make(chan atomicPropResponse)
+
+    request := atomicPropRequest{
+        RequestType: AtomicPropRequestGetRef,
+        AtomicPropertiesHash: atomicPropHash,
+        ColorIdentity: card.ColorIdentity,
+        ColorIndicator: card.ColorIndicator,
+        Colors: card.Colors,
+        ConvertedManaCost: card.ConvertedManaCost,
+        EDHRecRank: card.EDHRecRank,
+        FaceConvertedManaCost: card.FaceConvertedManaCost,
+        Hand: card.Hand,
+        IsReserved: card.IsReserved,
+        Layout: card.Layout,
+        Life: card.Life,
+        Loyalty: card.Loyalty,
+        ManaCost: card.ManaCost,
+        MTGStocksId: card.MTGStocksId,
+        Name: card.Name,
+        Power: card.Power,
+        ScryfallOracleId: card.ScryfallOracleId,
+        Side: card.Side,
+        Text: card.Text,
+        Toughness: card.Toughness,
+        Type: card.Type,
+        ResponseChan: responseChan}
+
+    atomicPropertiesRequest <- request
+    response := <-responseChan
+	if response.Error != nil {
+		return false, response.Error
+	}
+
+    err := card.InsertRemainingAtomicPropertiesToDb(queries, response.AtomicPropertiesId)
     if err != nil {
-        return err
+        return false, err
     }
 
-    return checkRowsAffected(res, 1, "delete atomic properties record")
-}
-
-func (card *MTGCard) InsertAllCardDataToDb(queries *dbQueries, setId int64) (bool, error) {
-	newAtomicPropertiesAdded := false
-
-	// First, calculate the atomic properties hash, so we can see if this card
-	// shares its atomic properties with an existing card in the db
-	atomicPropHash := HashToHexString(card.AtomicPropertiesHash())
-	atomicPropId, refCnt, exists, err := card.GetAtomicPropertiesId(queries, atomicPropHash)
-	if err != nil {
-		return false, err
-	}
-
-	if !exists {
-		// If the atomic properties don't exist already, we need to insert
-		// a new record
-		atomicPropId, err = card.InsertAtomicPropertiesToDb(queries, atomicPropHash)
-		if err != nil {
-			return false, err
-		}
-		newAtomicPropertiesAdded = true
-	} else {
-		// Otherwise, update the reference count of this atomic properties record
-		_, err := queries.UpdateRefCntQuery.Exec(refCnt + 1, atomicPropId)
-		if err != nil {
-			return false, err
-		}
-	}
-
 	// Insert the main card record in the all_cards table
-	err = card.InsertCardToDb(queries, atomicPropId, setId)
+	err = card.InsertCardToDb(queries, response.AtomicPropertiesId, setId)
 	if err != nil {
 		return false, err
 	}
@@ -390,7 +453,7 @@ func (card *MTGCard) InsertAllCardDataToDb(queries *dbQueries, setId int64) (boo
 		return false, nil
 	}
 
-	return newAtomicPropertiesAdded, nil
+	return response.NewRecordAdded, nil
 }
 
 func (card *MTGCard) InsertOtherTableCardData(queries *dbQueries) error {

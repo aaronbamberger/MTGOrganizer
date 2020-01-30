@@ -8,10 +8,6 @@ type dbQueries struct {
     InsertSetQuery *sql.Stmt
     UpdateSetQuery *sql.Stmt
     InsertSetTranslationQuery *sql.Stmt
-	NumAtomicPropertiesQuery *sql.Stmt
-	AtomicPropertiesIdQuery *sql.Stmt
-	AtomicPropertiesHashQuery *sql.Stmt
-	InsertAtomicPropertiesQuery *sql.Stmt
 	InsertCardQuery *sql.Stmt
 	UpdateCardQuery *sql.Stmt
 	InsertAltLangDataQuery *sql.Stmt
@@ -29,8 +25,6 @@ type dbQueries struct {
 	DeleteFrameEffectQuery *sql.Stmt
 	DeleteOtherFaceQuery *sql.Stmt
 	DeleteVariationQuery *sql.Stmt
-	UpdateRefCntQuery *sql.Stmt
-    DeleteAtomicPropertiesQuery *sql.Stmt
     DeleteAltLangDataQuery *sql.Stmt
     DeleteBaseTypesQuery *sql.Stmt
     DeleteCardPrintingsQuery *sql.Stmt
@@ -49,10 +43,6 @@ func (queries *dbQueries) queriesForTx(tx *sql.Tx) *dbQueries {
     txQueries.InsertSetQuery = tx.Stmt(queries.InsertSetQuery)
     txQueries.UpdateSetQuery = tx.Stmt(queries.UpdateSetQuery)
     txQueries.InsertSetTranslationQuery = tx.Stmt(queries.InsertSetTranslationQuery)
-    txQueries.NumAtomicPropertiesQuery = tx.Stmt(queries.NumAtomicPropertiesQuery)
-    txQueries.AtomicPropertiesIdQuery = tx.Stmt(queries.AtomicPropertiesIdQuery)
-    txQueries.AtomicPropertiesHashQuery = tx.Stmt(queries.AtomicPropertiesHashQuery)
-    txQueries.InsertAtomicPropertiesQuery = tx.Stmt(queries.InsertAtomicPropertiesQuery)
     txQueries.InsertCardQuery = tx.Stmt(queries.InsertCardQuery)
     txQueries.UpdateCardQuery = tx.Stmt(queries.UpdateCardQuery)
     txQueries.InsertAltLangDataQuery = tx.Stmt(queries.InsertAltLangDataQuery)
@@ -70,8 +60,6 @@ func (queries *dbQueries) queriesForTx(tx *sql.Tx) *dbQueries {
     txQueries.DeleteFrameEffectQuery = tx.Stmt(queries.DeleteFrameEffectQuery)
     txQueries.DeleteOtherFaceQuery = tx.Stmt(queries.DeleteOtherFaceQuery)
     txQueries.DeleteVariationQuery = tx.Stmt(queries.DeleteVariationQuery)
-    txQueries.UpdateRefCntQuery = tx.Stmt(queries.UpdateRefCntQuery)
-    txQueries.DeleteAtomicPropertiesQuery = tx.Stmt(queries.DeleteAtomicPropertiesQuery)
     txQueries.DeleteAltLangDataQuery = tx.Stmt(queries.DeleteAltLangDataQuery)
     txQueries.DeleteBaseTypesQuery = tx.Stmt(queries.DeleteBaseTypesQuery)
     txQueries.DeleteCardPrintingsQuery = tx.Stmt(queries.DeleteCardPrintingsQuery)
@@ -139,43 +127,6 @@ func prepareDbQueries(db *sql.DB) (*dbQueries, error) {
 		(set_id, set_translation_language_id, set_translated_name)
 		VALUES
 		(?, ?, ?)`)
-	if err != nil {
-		return &queries, err
-	}
-
-	queries.NumAtomicPropertiesQuery, err = db.Prepare(`SELECT COUNT(scryfall_oracle_id)
-		FROM atomic_card_data
-		WHERE card_data_hash = ?`)
-	if err != nil {
-		return &queries, err
-	}
-
-	queries.AtomicPropertiesIdQuery, err = db.Prepare(`SELECT atomic_card_data_id,
-		ref_cnt,
-		scryfall_oracle_id
-		FROM atomic_card_data
-		WHERE card_data_hash = ?
-        FOR UPDATE`)
-	if err != nil {
-		return &queries, err
-	}
-
-	queries.AtomicPropertiesHashQuery, err = db.Prepare(`SELECT card_data_hash,
-        ref_cnt
-		FROM atomic_card_data
-		WHERE atomic_card_data_id = ?
-        FOR UPDATE`)
-	if err != nil {
-		return &queries, err
-	}
-
-	queries.InsertAtomicPropertiesQuery, err = db.Prepare(`INSERT INTO atomic_card_data
-		(card_data_hash, color_identity, color_indicator, colors, converted_mana_cost,
-		edhrec_rank, face_converted_mana_cost, hand, is_reserved, layout, life,
-		loyalty, mana_cost, mtgstocks_id, name, card_power, scryfall_oracle_id,
-		side, text, toughness, card_type)
-		VALUES
-		(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		return &queries, err
 	}
@@ -352,21 +303,6 @@ func prepareDbQueries(db *sql.DB) (*dbQueries, error) {
 		return &queries, err
 	}
 
-	queries.UpdateRefCntQuery, err = db.Prepare(`UPDATE atomic_card_data
-		SET ref_cnt = ?
-		WHERE atomic_card_data_id = ?`)
-    if err != nil {
-        return &queries, err
-    }
-
-    queries.DeleteAtomicPropertiesQuery, err = db.Prepare(`DELETE FROM
-        atomic_card_data
-        WHERE
-        atomic_card_data_id = ?`)
-    if err != nil {
-        return &queries, err
-    }
-
     queries.DeleteAltLangDataQuery, err = db.Prepare(`DELETE FROM
         alternate_language_data
         WHERE
@@ -463,22 +399,6 @@ func (queries *dbQueries) cleanupDbQueries() {
         queries.InsertSetTranslationQuery.Close()
     }
 
-	if queries.NumAtomicPropertiesQuery != nil {
-		queries.NumAtomicPropertiesQuery.Close()
-	}
-
-	if queries.AtomicPropertiesIdQuery != nil {
-		queries.AtomicPropertiesIdQuery.Close()
-	}
-
-	if queries.AtomicPropertiesHashQuery != nil {
-		queries.AtomicPropertiesHashQuery.Close()
-	}
-
-	if queries.InsertAtomicPropertiesQuery != nil {
-		queries.InsertAtomicPropertiesQuery.Close()
-	}
-
 	if queries.InsertCardQuery != nil {
 		queries.InsertCardQuery.Close()
 	}
@@ -546,14 +466,6 @@ func (queries *dbQueries) cleanupDbQueries() {
 	if queries.DeleteVariationQuery != nil {
 		queries.DeleteVariationQuery.Close()
 	}
-
-	if queries.UpdateRefCntQuery != nil {
-		queries.UpdateRefCntQuery.Close()
-	}
-
-    if queries.DeleteAtomicPropertiesQuery != nil {
-        queries.DeleteAtomicPropertiesQuery.Close()
-    }
 
     if queries.DeleteAltLangDataQuery != nil {
         queries.DeleteAltLangDataQuery.Close()
