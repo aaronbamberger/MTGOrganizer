@@ -155,7 +155,15 @@ func maybeInsertSetToDb(db *sql.DB,
 			log.Printf("Set %s hashes don't match (db: %s, json: %s), updating set...\n",
 				set.Code, setDbHash, setHash)
 
-            // TODO: Update the set
+            setUpdateQueries := updateQueries.ForTx(setTx)
+            setDeleteQueries := deleteQueries.ForTx(setTx)
+            setInsertQueries := insertQueries.ForTx(setTx)
+            err := set.UpdateInDb(setUpdateQueries, setDeleteQueries, setInsertQueries, setId)
+            if err != nil {
+                log.Print(err)
+                setTx.Rollback()
+                return
+            }
 
 			setTx.Commit()
             stats.AddToExistingSetsUpdated(1)
@@ -176,7 +184,7 @@ func maybeInsertSetToDb(db *sql.DB,
 
 				cardGetQueries := getQueries.ForTx(cardTx)
 
-				cardExists, cardDbHash, _, err := card.GetHashAndId(cardGetQueries)
+				cardExists, cardDbHash, cardId, err := card.GetHashAndId(cardGetQueries)
 				if err != nil {
 					log.Print(err)
 					cardTx.Rollback()
@@ -211,16 +219,20 @@ func maybeInsertSetToDb(db *sql.DB,
 						log.Printf("Card %s hash doesn't match (db: %s, card: %s), updating",
 							card.Name, cardDbHash, cardHash)
 
-                        // TODO: Update the card
-                        /*
-						newAtomicPropetiesAdded, err := card.UpdateCardDataInDb(cardQueries,
-                            atomicCardDataId, setId)
-						if err != nil {
-							log.Print(err)
-							cardTx.Rollback()
-							continue
-						}
-                        */
+                        cardUpdateQueries := updateQueries.ForTx(cardTx)
+                        cardDeleteQueries := deleteQueries.ForTx(cardTx)
+                        cardInsertQueries := insertQueries.ForTx(cardTx)
+                        err := card.UpdateInDb(
+                            cardUpdateQueries,
+                            cardDeleteQueries,
+                            cardInsertQueries,
+                            cardId,
+                            setId)
+                        if err != nil {
+                            log.Print(err)
+                            cardTx.Rollback()
+                            continue
+                        }
                         cardTx.Commit()
                         totalCards += 1
                         totalExistingCards += 1
