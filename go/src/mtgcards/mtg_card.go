@@ -112,56 +112,53 @@ type MTGCard struct {
 	MTGOId int `json:"mtgoId"`
 	OtherFaceIds []string `json:"otherFaceIds"`
 
-	atomicPropertiesHash hash.Hash
-	atomicPropertiesHashValid bool
 	hash hash.Hash
 	hashValid bool
-
 }
 
-func (card *MTGCard) AtomicPropertiesHash() hash.Hash {
-	if !card.atomicPropertiesHashValid {
-        card.atomicPropertiesHash = fnv.New128a()
+func (card *MTGCard) Hash() hash.Hash {
+	if !card.hashValid {
+        card.hash = fnv.New128a()
 
         // Start with the common atomic card properties
         for _, colorIdentity := range card.ColorIdentity {
-            card.atomicPropertiesHash.Write([]byte(colorIdentity))
+            card.hash.Write([]byte(colorIdentity))
         }
         for _, color := range card.Colors {
-            card.atomicPropertiesHash.Write([]byte(color))
+            card.hash.Write([]byte(color))
         }
-        card.atomicPropertiesHash.Write([]byte(card.Layout))
-        card.atomicPropertiesHash.Write([]byte(card.Power))
-        card.atomicPropertiesHash.Write([]byte(card.ScryfallOracleId))
+        card.hash.Write([]byte(card.Layout))
+        card.hash.Write([]byte(card.Power))
+        card.hash.Write([]byte(card.ScryfallOracleId))
         for _, subtype := range card.Subtypes {
-            card.atomicPropertiesHash.Write([]byte(subtype))
+            card.hash.Write([]byte(subtype))
         }
         for _, supertype := range card.Supertypes {
-            card.atomicPropertiesHash.Write([]byte(supertype))
+            card.hash.Write([]byte(supertype))
         }
-        card.atomicPropertiesHash.Write([]byte(card.Text))
-        card.atomicPropertiesHash.Write([]byte(card.Toughness))
-        card.atomicPropertiesHash.Write([]byte(card.Type))
+        card.hash.Write([]byte(card.Text))
+        card.hash.Write([]byte(card.Toughness))
+        card.hash.Write([]byte(card.Type))
         for _, cardType := range card.Types {
-            card.atomicPropertiesHash.Write([]byte(cardType))
+            card.hash.Write([]byte(cardType))
         }
         for _, colorIndicator := range card.ColorIndicator {
-            card.atomicPropertiesHash.Write([]byte(colorIndicator))
+            card.hash.Write([]byte(colorIndicator))
         }
-        card.atomicPropertiesHash.Write([]byte(card.Loyalty))
-        card.atomicPropertiesHash.Write([]byte(card.Name))
+        card.hash.Write([]byte(card.Loyalty))
+        card.hash.Write([]byte(card.Name))
         for _, name := range card.Names {
-            card.atomicPropertiesHash.Write([]byte(name))
+            card.hash.Write([]byte(name))
         }
-        card.atomicPropertiesHash.Write([]byte(card.Side))
+        card.hash.Write([]byte(card.Side))
 
         // Next, do the rest of the atomic card properties
-		binary.Write(card.atomicPropertiesHash, binary.BigEndian, card.ConvertedManaCost)
-		binary.Write(card.atomicPropertiesHash, binary.BigEndian, card.FaceConvertedManaCost)
+		binary.Write(card.hash, binary.BigEndian, card.ConvertedManaCost)
+		binary.Write(card.hash, binary.BigEndian, card.FaceConvertedManaCost)
 		for _, languageData := range card.AlternateLanguageData {
 			languageDataHash := languageData.Hash()
 			languageDataHashBytes := make([]byte, 0, languageDataHash.Size())
-			card.atomicPropertiesHash.Write(languageDataHash.Sum(languageDataHashBytes))
+			card.hash.Write(languageDataHash.Sum(languageDataHashBytes))
 		}
 
 		// Since go maps don't have a defined iteration order,
@@ -173,13 +170,13 @@ func (card *MTGCard) AtomicPropertiesHash() hash.Hash {
 		}
 		sort.Strings(legalityFormats)
 		for _, format := range legalityFormats {
-			card.atomicPropertiesHash.Write([]byte(format))
-			card.atomicPropertiesHash.Write([]byte(card.Legalities[format]))
+			card.hash.Write([]byte(format))
+			card.hash.Write([]byte(card.Legalities[format]))
 		}
 
-		binary.Write(card.atomicPropertiesHash, binary.BigEndian, card.MTGStocksId)
+		binary.Write(card.hash, binary.BigEndian, card.MTGStocksId)
 		for _, printing := range card.Printings {
-			card.atomicPropertiesHash.Write([]byte(printing))
+			card.hash.Write([]byte(printing))
 		}
 
 		// Since go maps don't have a defined iteration order,
@@ -191,18 +188,18 @@ func (card *MTGCard) AtomicPropertiesHash() hash.Hash {
 		}
 		sort.Strings(purchaseSites)
 		for _, site := range purchaseSites {
-			card.atomicPropertiesHash.Write([]byte(site))
-			card.atomicPropertiesHash.Write([]byte(card.PurchaseURLs[site]))
+			card.hash.Write([]byte(site))
+			card.hash.Write([]byte(card.PurchaseURLs[site]))
 		}
 
 		for _, ruling := range card.Rulings {
 			rulingHash := ruling.Hash()
 			rulingHashBytes := make([]byte, 0, rulingHash.Size())
-			card.atomicPropertiesHash.Write(rulingHash.Sum(rulingHashBytes))
+			card.hash.Write(rulingHash.Sum(rulingHashBytes))
 		}
-		binary.Write(card.atomicPropertiesHash, binary.BigEndian, card.EDHRecRank)
-		card.atomicPropertiesHash.Write([]byte(card.Hand))
-		binary.Write(card.atomicPropertiesHash, binary.BigEndian, card.IsReserved)
+		binary.Write(card.hash, binary.BigEndian, card.EDHRecRank)
+		card.hash.Write([]byte(card.Hand))
+		binary.Write(card.hash, binary.BigEndian, card.IsReserved)
 
 		// Since go maps don't have a defined iteration order,
 		// Ensure a repeatable hash by sorting the keyset, and using
@@ -213,30 +210,16 @@ func (card *MTGCard) AtomicPropertiesHash() hash.Hash {
 		}
 		sort.Strings(leadershipFormats)
 		for _, format := range leadershipFormats {
-			card.atomicPropertiesHash.Write([]byte(format))
-			binary.Write(card.atomicPropertiesHash, binary.BigEndian, card.LeadershipSkills[format])
+			card.hash.Write([]byte(format))
+			binary.Write(card.hash, binary.BigEndian, card.LeadershipSkills[format])
 		}
 
-		card.atomicPropertiesHash.Write([]byte(card.Life))
-		card.atomicPropertiesHash.Write([]byte(card.Loyalty))
-		card.atomicPropertiesHash.Write([]byte(card.ManaCost))
+		card.hash.Write([]byte(card.Life))
+		card.hash.Write([]byte(card.Loyalty))
+		card.hash.Write([]byte(card.ManaCost))
 
-		card.atomicPropertiesHashValid = true
-	}
 
-	return card.atomicPropertiesHash
-}
-
-func (card *MTGCard) Hash() hash.Hash {
-	if !card.hashValid {
-		// Start with the hash of the atomic properties
-        card.hash = fnv.New128a()
-        atomicPropertiesHash := card.AtomicPropertiesHash()
-        atomicPropertiesHashBytes := make([]byte, 0, atomicPropertiesHash.Size())
-        atomicPropertiesHashBytes = atomicPropertiesHash.Sum(atomicPropertiesHashBytes)
-        card.hash.Write(atomicPropertiesHashBytes)
-
-		// Next do the card common properties
+		// Next do the non-atomic common properties
 		card.hash.Write([]byte(card.Artist))
 		card.hash.Write([]byte(card.BorderColor))
 		card.hash.Write([]byte(card.Number))

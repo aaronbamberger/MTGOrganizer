@@ -12,7 +12,7 @@ func main() {
 	}
 
 	// Connect to the database
-	db, err := sql.Open("mysql", "app_user:app_db_password@tcp(172.18.0.3)/mtg_cards")
+	db, err := sql.Open("mysql", "app_user:app_db_password@tcp(172.18.0.2)/mtg_cards")
 	defer db.Close()
 	if err != nil {
 		log.Fatal(err)
