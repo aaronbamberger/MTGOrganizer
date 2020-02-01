@@ -1,26 +1,12 @@
-package mtgcards
+package carddb
 
 import "context"
 import "database/sql"
 import "encoding/hex"
-import "fmt"
 import "hash"
 import "log"
+import "mtgcards"
 import "sync"
-
-func checkRowsAffected(res sql.Result, expectedAffected int64, errString string) error {
-	rowsAffected, err := res.RowsAffected()
-	if err != nil {
-		return err
-	}
-
-	if rowsAffected != expectedAffected {
-		return fmt.Errorf("Query %s affected an unexpected number of rows, expected %d, got %d\n",
-			errString, expectedAffected, rowsAffected)
-	}
-
-	return nil
-}
 
 func HashToHexString(hashVal hash.Hash) string {
 	hashBytes := make([]byte, 0, hashVal.Size())
@@ -28,9 +14,11 @@ func HashToHexString(hashVal hash.Hash) string {
 	return hex.EncodeToString(hashBytes)
 }
 
-func ImportSetsToDb(db *sql.DB, sets map[string]MTGSet) (*DbUpdateStats, error) {
+func ImportSetsToDB(
+        db *sql.DB,
+        sets map[string]mtgcards.MTGSet) (*DBUpdateStats, error) {
 	var setImportWg sync.WaitGroup
-	var stats DbUpdateStats
+	var stats DBUpdateStats
 
 	// We defer the cleanup before calling the setup function, because the setup
 	// function might get partway through the initialization, and then error out,
@@ -43,10 +31,10 @@ func ImportSetsToDb(db *sql.DB, sets map[string]MTGSet) (*DbUpdateStats, error) 
 		return nil, err
 	}
 
-    var getQueries dbGetQueries
-    var insertQueries dbInsertQueries
-    var updateQueries dbUpdateQueries
-    var deleteQueries dbDeleteQueries
+    var getQueries DBGetQueries
+    var insertQueries DBInsertQueries
+    var updateQueries DBUpdateQueries
+    var deleteQueries DBDeleteQueries
 
     defer getQueries.Cleanup()
     err = getQueries.Prepare(db)
@@ -86,14 +74,15 @@ func ImportSetsToDb(db *sql.DB, sets map[string]MTGSet) (*DbUpdateStats, error) 
 	return &stats, nil
 }
 
-func maybeInsertSetToDb(db *sql.DB,
-        getQueries *dbGetQueries,
-        insertQueries *dbInsertQueries,
-        updateQueries *dbUpdateQueries,
-        deleteQueries *dbDeleteQueries,
-        stats *DbUpdateStats,
+func maybeInsertSetToDb(
+        db *sql.DB,
+        getQueries *DBGetQueries,
+        insertQueries *DBInsertQueries,
+        updateQueries *DBUpdateQueries,
+        deleteQueries *DBDeleteQueries,
+        stats *DBUpdateStats,
 		wg *sync.WaitGroup,
-        set MTGSet) {
+        set mtgcards.MTGSet) {
 	defer wg.Done()
 	ctx := context.Background()
 
@@ -119,7 +108,7 @@ func maybeInsertSetToDb(db *sql.DB,
     setGetQueries := getQueries.ForTx(setTx)
 
 	// First, check to see if this set is in the DB at all
-	setExists, setDbHash, setId, err := set.GetHashAndId(setGetQueries)
+	setExists, setDbHash, setId, err := GetSetHashAndIdFromDB(set.Code, setGetQueries)
 	if err != nil {
 		log.Print(err)
 		setTx.Rollback()
@@ -132,13 +121,9 @@ func maybeInsertSetToDb(db *sql.DB,
 	totalNewCards := 0
 	totalNewCardsInNewSets := 0
 	totalNewCardsInExistingSets := 0
-	totalNewAtomicRecordsForNewCards := 0
-    totalExistingAtomicRecordsForNewCards := 0
 	totalExistingCards := 0
 	totalExistingCardsHashSkipped := 0
 	totalExistingCardsUpdated := 0
-    totalNewAtomicRecordsForExistingCards := 0
-    totalExistingAtomicRecordsForExistingCards := 0
 
 	if setExists {
 		log.Printf("Set %s already exists in the database\n", set.Code)
@@ -158,7 +143,7 @@ func maybeInsertSetToDb(db *sql.DB,
             setUpdateQueries := updateQueries.ForTx(setTx)
             setDeleteQueries := deleteQueries.ForTx(setTx)
             setInsertQueries := insertQueries.ForTx(setTx)
-            err := set.UpdateInDb(setUpdateQueries, setDeleteQueries, setInsertQueries, setId)
+            err := UpdateSetInDB(setId, &set, setUpdateQueries, setDeleteQueries, setInsertQueries)
             if err != nil {
                 log.Print(err)
                 setTx.Rollback()
@@ -184,7 +169,7 @@ func maybeInsertSetToDb(db *sql.DB,
 
 				cardGetQueries := getQueries.ForTx(cardTx)
 
-				cardExists, cardDbHash, cardId, err := card.GetHashAndId(cardGetQueries)
+				cardExists, cardDbHash, cardId, err := GetCardHashAndIdFromDB(card.UUID, cardGetQueries)
 				if err != nil {
 					log.Print(err)
 					cardTx.Rollback()
@@ -193,7 +178,7 @@ func maybeInsertSetToDb(db *sql.DB,
 
 				if !cardExists {
                     cardInsertQueries := insertQueries.ForTx(cardTx)
-                    err := card.InsertToDb(cardInsertQueries, setId)
+                    err := InsertCardToDB(card, setId, cardInsertQueries)
 					if err != nil {
 						log.Print(err)
 						cardTx.Rollback()
@@ -222,12 +207,13 @@ func maybeInsertSetToDb(db *sql.DB,
                         cardUpdateQueries := updateQueries.ForTx(cardTx)
                         cardDeleteQueries := deleteQueries.ForTx(cardTx)
                         cardInsertQueries := insertQueries.ForTx(cardTx)
-                        err := card.UpdateInDb(
+                        err := UpdateCardInDB(
+                            cardId,
+                            setId,
+                            card,
                             cardUpdateQueries,
                             cardDeleteQueries,
-                            cardInsertQueries,
-                            cardId,
-                            setId)
+                            cardInsertQueries)
                         if err != nil {
                             log.Print(err)
                             cardTx.Rollback()
@@ -246,7 +232,7 @@ func maybeInsertSetToDb(db *sql.DB,
 		// This set does not already exist in the db
 
         setInsertQueries := insertQueries.ForTx(setTx)
-		setId, err := set.InsertToDb(setInsertQueries)
+		setId, err := InsertSetToDB(&set, setInsertQueries)
 		if err != nil {
 			log.Print(err)
 			setTx.Rollback()
@@ -273,7 +259,7 @@ func maybeInsertSetToDb(db *sql.DB,
 
             cardInsertQueries := insertQueries.ForTx(cardTx)
 
-			err = card.InsertToDb(cardInsertQueries, setId)
+			err = InsertCardToDB(card, setId, cardInsertQueries)
 			if err != nil {
 				log.Print(err)
 				cardTx.Rollback()
@@ -291,13 +277,8 @@ func maybeInsertSetToDb(db *sql.DB,
 	stats.AddToTotalNewCards(totalNewCards)
 	stats.AddToTotalNewCardsInNewSets(totalNewCardsInNewSets)
 	stats.AddToTotalNewCardsInExistingSets(totalNewCardsInExistingSets)
-	stats.AddToTotalNewAtomicRecordsForNewCards(totalNewAtomicRecordsForNewCards)
-    stats.AddToTotalNewAtomicRecordsForExistingCards(totalNewAtomicRecordsForExistingCards)
-    stats.AddToTotalExistingAtomicRecordsForNewCards(totalExistingAtomicRecordsForNewCards)
-    stats.AddToTotalExistingAtomicRecordsForExistingCards(totalExistingAtomicRecordsForExistingCards)
 	stats.AddToTotalExistingCards(totalExistingCards)
 	stats.AddToExistingCardsSkipped(totalExistingCardsHashSkipped)
 	stats.AddToExistingCardsUpdated(totalExistingCardsUpdated)
 	log.Printf("Done processing set %s\n", set.Code)
 }
-

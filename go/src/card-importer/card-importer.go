@@ -4,6 +4,7 @@ import "database/sql"
 import _ "github.com/go-sql-driver/mysql"
 import "log"
 import "mtgcards"
+import "carddb"
 
 func main() {
 	allSets, err := mtgcards.DownloadAllPrintings(true)
@@ -20,7 +21,7 @@ func main() {
 
 	db.SetMaxIdleConns(1000)
 
-	stats, err := mtgcards.ImportSetsToDb(db, allSets)
+	stats, err := carddb.ImportSetsToDB(db, allSets)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -38,14 +39,6 @@ func main() {
 	log.Printf("Total new cards in new sets: %d\n", stats.TotalNewCardsInNewSets())
 	log.Printf("Total new cards in existing sets: %d\n",
         stats.TotalNewCardsInExistingSets())
-	log.Printf("New atomic records for new cards: %d\n",
-        stats.TotalNewAtomicRecordsForNewCards())
-    log.Printf("New atomic records for existing cards: %d\n",
-        stats.TotalNewAtomicRecordsForExistingCards())
-    log.Printf("Existing atomic records for new cards: %d\n",
-        stats.TotalExistingAtomicRecordsForNewCards())
-    log.Printf("Existing atomic records for existing cards: %d\n",
-        stats.TotalExistingAtomicRecordsForExistingCards())
 	log.Printf("Total existing cards: %d\n", stats.TotalExistingCards())
 	log.Printf("Existing cards skipped due to hash match: %d\n",
         stats.ExistingCardsSkipped())

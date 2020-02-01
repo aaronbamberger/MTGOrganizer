@@ -1,4 +1,4 @@
-package mtgcards
+package carddb
 
 import "context"
 import "database/sql"
