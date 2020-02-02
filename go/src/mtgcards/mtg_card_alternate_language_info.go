@@ -1,7 +1,6 @@
 package mtgcards
 
 import "encoding/binary"
-import "hash"
 import "hash/fnv"
 
 type MTGCardAlternateLanguageInfo struct {
@@ -12,21 +11,22 @@ type MTGCardAlternateLanguageInfo struct {
 	Text string `json:"text"`
 	Type string `json:"type"`
 
-	hash hash.Hash
+	hash string
 	hashValid bool
 }
 
-func (langInfo *MTGCardAlternateLanguageInfo) Hash() hash.Hash {
+func (langInfo *MTGCardAlternateLanguageInfo) Hash() string {
 	if !langInfo.hashValid {
-		langInfo.hash = fnv.New128a()
+        hash := fnv.New128a()
 
-		langInfo.hash.Write([]byte(langInfo.FlavorText))
-		langInfo.hash.Write([]byte(langInfo.Language))
-		binary.Write(langInfo.hash, binary.BigEndian, langInfo.MultiverseId)
-		langInfo.hash.Write([]byte(langInfo.Name))
-		langInfo.hash.Write([]byte(langInfo.Text))
-		langInfo.hash.Write([]byte(langInfo.Type))
+		hash.Write([]byte(langInfo.FlavorText))
+		hash.Write([]byte(langInfo.Language))
+		binary.Write(hash, binary.BigEndian, langInfo.MultiverseId)
+		hash.Write([]byte(langInfo.Name))
+		hash.Write([]byte(langInfo.Text))
+		hash.Write([]byte(langInfo.Type))
 
+        langInfo.hash = hashToHexString(hash)
 		langInfo.hashValid = true
 	}
 

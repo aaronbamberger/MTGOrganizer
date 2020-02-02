@@ -5,6 +5,7 @@ import "database/sql"
 type DBGetQueries struct {
     GetSetHashQuery *sql.Stmt
     GetCardHashQuery *sql.Stmt
+    GetTokenHashQuery *sql.Stmt
 }
 
 type DBInsertQueries struct {
@@ -23,11 +24,17 @@ type DBInsertQueries struct {
 	InsertPurchaseURLQuery *sql.Stmt
 	InsertRulingQuery *sql.Stmt
 	InsertVariationQuery *sql.Stmt
+    InsertTokenQuery *sql.Stmt
+    InsertTokenBaseTypeQuery *sql.Stmt
+    InsertTokenSubtypeQuery *sql.Stmt
+    InsertTokenSupertypeQuery *sql.Stmt
+    InsertTokenReverseRelatedQuery *sql.Stmt
 }
 
 type DBUpdateQueries struct {
     UpdateSetQuery *sql.Stmt
 	UpdateCardQuery *sql.Stmt
+    UpdateTokenQuery *sql.Stmt
 }
 
 type DBDeleteQueries struct {
@@ -44,6 +51,10 @@ type DBDeleteQueries struct {
     DeletePurchaseURLsQuery *sql.Stmt
     DeleteRulingsQuery *sql.Stmt
 	DeleteVariationsQuery *sql.Stmt
+    DeleteTokenBaseTypesQuery *sql.Stmt
+    DeleteTokenSubtypesQuery *sql.Stmt
+    DeleteTokenSupertypesQuery *sql.Stmt
+    DeleteTokenReverseRelatedQuery *sql.Stmt
 }
 
 func (queries *DBGetQueries) ForTx(tx *sql.Tx) *DBGetQueries {
@@ -51,6 +62,7 @@ func (queries *DBGetQueries) ForTx(tx *sql.Tx) *DBGetQueries {
 
     txQueries.GetSetHashQuery = tx.Stmt(queries.GetSetHashQuery)
     txQueries.GetCardHashQuery = tx.Stmt(queries.GetCardHashQuery)
+    txQueries.GetTokenHashQuery = tx.Stmt(queries.GetTokenHashQuery)
 
     return &txQueries
 }
@@ -73,6 +85,11 @@ func (queries *DBInsertQueries) ForTx(tx *sql.Tx) *DBInsertQueries {
 	txQueries.InsertPurchaseURLQuery = tx.Stmt(queries.InsertPurchaseURLQuery)
 	txQueries.InsertRulingQuery = tx.Stmt(queries.InsertRulingQuery)
 	txQueries.InsertVariationQuery = tx.Stmt(queries.InsertVariationQuery)
+    txQueries.InsertTokenQuery = tx.Stmt(queries.InsertTokenQuery)
+    txQueries.InsertTokenBaseTypeQuery = tx.Stmt(queries.InsertTokenBaseTypeQuery)
+    txQueries.InsertTokenSubtypeQuery = tx.Stmt(queries.InsertTokenSubtypeQuery)
+    txQueries.InsertTokenSupertypeQuery = tx.Stmt(queries.InsertTokenSupertypeQuery)
+    txQueries.InsertTokenReverseRelatedQuery = tx.Stmt(queries.InsertTokenReverseRelatedQuery)
 
     return &txQueries
 }
@@ -82,6 +99,7 @@ func (queries *DBUpdateQueries) ForTx(tx *sql.Tx) *DBUpdateQueries {
 
     txQueries.UpdateSetQuery = tx.Stmt(queries.UpdateSetQuery)
 	txQueries.UpdateCardQuery = tx.Stmt(queries.UpdateCardQuery)
+    txQueries.UpdateTokenQuery = tx.Stmt(queries.UpdateTokenQuery)
 
     return &txQueries
 }
@@ -102,6 +120,10 @@ func (queries *DBDeleteQueries) ForTx(tx *sql.Tx) *DBDeleteQueries {
     txQueries.DeletePurchaseURLsQuery = tx.Stmt(queries.DeletePurchaseURLsQuery)
     txQueries.DeleteRulingsQuery = tx.Stmt(queries.DeleteRulingsQuery)
 	txQueries.DeleteVariationsQuery = tx.Stmt(queries.DeleteVariationsQuery)
+    txQueries.DeleteTokenBaseTypesQuery = tx.Stmt(queries.DeleteTokenBaseTypesQuery)
+    txQueries.DeleteTokenSubtypesQuery = tx.Stmt(queries.DeleteTokenSubtypesQuery)
+    txQueries.DeleteTokenSupertypesQuery = tx.Stmt(queries.DeleteTokenSupertypesQuery)
+    txQueries.DeleteTokenReverseRelatedQuery = tx.Stmt(queries.DeleteTokenReverseRelatedQuery)
 
     return &txQueries
 }
@@ -123,6 +145,13 @@ func (queries *DBGetQueries) Prepare(db *sql.DB) error {
         return err
 	}
 
+    queries.GetTokenHashQuery, err = db.Prepare(`SELECT token_hash, token_id
+        FROM all_tokens
+        WHERE uuid = ?`)
+    if err != nil {
+        return err
+    }
+
     return nil
 }
 
@@ -133,6 +162,10 @@ func (queries *DBGetQueries) Cleanup() {
 
     if queries.GetCardHashQuery != nil {
         queries.GetCardHashQuery.Close()
+    }
+
+    if queries.GetTokenHashQuery != nil {
+        queries.GetTokenHashQuery.Close()
     }
 }
 
@@ -186,7 +219,7 @@ func (queries *DBInsertQueries) Prepare(db *sql.DB) error {
 		return err
 	}
 
-	queries.InsertBaseTypeQuery, err = db.Prepare(`INSERT INTO base_types
+	queries.InsertBaseTypeQuery, err = db.Prepare(`INSERT INTO card_base_types
 		(card_id, base_type_option_id)
 		VALUES
 		(?, ?)`)
@@ -274,6 +307,49 @@ func (queries *DBInsertQueries) Prepare(db *sql.DB) error {
 		return err
 	}
 
+    queries.InsertTokenQuery, err = db.Prepare(`INSERT INTO all_tokens
+        (uuid, token_hash, artist, border_color, card_number, card_power,
+        card_type, color_identity, color_indicator, colors, is_online_only,
+        layout, loyalty, name, scryfall_id, scryfall_illustration_id,
+        scryfall_oracle_id, set_id, side, text, toughness, watermark)
+        VALUES
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    if err != nil {
+        return err
+    }
+
+    queries.InsertTokenBaseTypeQuery, err = db.Prepare(`INSERT INTO token_base_types
+        (token_id, base_type_option_id)
+        VALUES
+        (?, ?)`)
+    if err != nil {
+        return err
+    }
+
+    queries.InsertTokenSubtypeQuery, err = db.Prepare(`INSERT INTO token_subtypes
+        (token_id, subtype_option_id)
+        VALUES
+        (?, ?)`)
+    if err != nil {
+        return err
+    }
+
+    queries.InsertTokenSupertypeQuery, err = db.Prepare(`INSERT INTO token_supertypes
+        (token_id, supertype_option_id)
+        VALUES
+        (?, ?)`)
+    if err != nil {
+        return err
+    }
+
+    queries.InsertTokenReverseRelatedQuery, err = db.Prepare(`INSERT INTO token_reverse_related
+        (token_id, reverse_related_card)
+        VALUES
+        (?, ?)`)
+    if err != nil {
+        return err
+    }
+
     return nil
 }
 
@@ -336,6 +412,26 @@ func (queries *DBInsertQueries) Cleanup() {
 
 	if queries.InsertVariationQuery != nil {
         queries.InsertVariationQuery.Close()
+    }
+
+    if queries.InsertTokenQuery != nil {
+        queries.InsertTokenQuery.Close()
+    }
+
+    if queries.InsertTokenBaseTypeQuery != nil {
+        queries.InsertTokenBaseTypeQuery.Close()
+    }
+
+    if queries.InsertTokenSubtypeQuery != nil {
+        queries.InsertTokenSubtypeQuery.Close()
+    }
+
+    if queries.InsertTokenSupertypeQuery != nil {
+        queries.InsertTokenSupertypeQuery.Close()
+    }
+
+    if queries.InsertTokenReverseRelatedQuery != nil {
+        queries.InsertTokenReverseRelatedQuery.Close()
     }
 }
 
@@ -428,6 +524,33 @@ func (queries *DBUpdateQueries) Prepare(db *sql.DB) error {
         return err
     }
 
+    queries.UpdateTokenQuery, err = db.Prepare(`UPDATE all_tokens SET
+        token_hash = ?,
+        artist = ?,
+        border_color = ?,
+        card_number = ?,
+        card_power = ?,
+        card_type = ?,
+        color_identity = ?,
+        color_indicator = ?,
+        colors = ?,
+        is_online_only = ?,
+        layout = ?,
+        loyalty = ?,
+        name = ?,
+        scryfall_id = ?,
+        scryfall_illustration_id = ?,
+        scryfall_oracle_id = ?,
+        set_id = ?,
+        side = ?,
+        text = ?,
+        toughness = ?,
+        watermark = ?
+        WHERE uuid = ?`)
+    if err != nil {
+        return err
+    }
+
     return nil
 }
 
@@ -438,6 +561,10 @@ func (queries *DBUpdateQueries) Cleanup() {
 
 	if queries.UpdateCardQuery != nil {
         queries.UpdateCardQuery.Close()
+    }
+
+    if queries.UpdateTokenQuery != nil {
+        queries.UpdateTokenQuery.Close()
     }
 }
 
@@ -459,7 +586,7 @@ func (queries *DBDeleteQueries) Prepare(db *sql.DB) error {
     }
 
     queries.DeleteBaseTypesQuery, err = db.Prepare(`DELETE
-        FROM base_types
+        FROM card_base_types
         WHERE card_id = ?`)
     if err != nil {
         return err
@@ -535,6 +662,34 @@ func (queries *DBDeleteQueries) Prepare(db *sql.DB) error {
 		return err
 	}
 
+    queries.DeleteTokenBaseTypesQuery, err = db.Prepare(`DELETE
+        FROM token_base_types
+        WHERE token_id = ?`)
+    if err != nil {
+        return err
+    }
+
+    queries.DeleteTokenSubtypesQuery, err = db.Prepare(`DELETE
+        FROM token_subtypes
+        WHERE token_id = ?`)
+    if err != nil {
+        return err
+    }
+
+    queries.DeleteTokenSupertypesQuery, err = db.Prepare(`DELETE
+        FROM token_supertypes
+        WHERE token_id = ?`)
+    if err != nil {
+        return err
+    }
+
+    queries.DeleteTokenReverseRelatedQuery, err = db.Prepare(`DELETE
+        FROM token_reverse_related
+        WHERE token_id = ?`)
+    if err != nil {
+        return err
+    }
+
     return nil
 }
 
@@ -588,5 +743,21 @@ func (queries *DBDeleteQueries) Cleanup() {
 
 	if queries.DeleteVariationsQuery != nil {
         queries.DeleteVariationsQuery.Close()
+    }
+
+    if queries.DeleteTokenBaseTypesQuery != nil {
+        queries.DeleteTokenBaseTypesQuery.Close()
+    }
+
+    if queries.DeleteTokenSubtypesQuery != nil {
+        queries.DeleteTokenSubtypesQuery.Close()
+    }
+
+    if queries.DeleteTokenSupertypesQuery != nil {
+        queries.DeleteTokenSupertypesQuery.Close()
+    }
+
+    if queries.DeleteTokenReverseRelatedQuery != nil {
+        queries.DeleteTokenReverseRelatedQuery.Close()
     }
 }

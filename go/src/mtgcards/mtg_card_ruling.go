@@ -1,23 +1,23 @@
 package mtgcards
 
-import "hash"
 import "hash/fnv"
 
 type MTGCardRuling struct {
 	Date string `json:"date"`
 	Text string `json:"text"`
 
-	hash hash.Hash
+	hash string
 	hashValid bool
 }
 
-func (ruling *MTGCardRuling) Hash() hash.Hash {
+func (ruling *MTGCardRuling) Hash() string {
 	if !ruling.hashValid {
-		ruling.hash = fnv.New128a()
+        hash := fnv.New128a()
 
-		ruling.hash.Write([]byte(ruling.Date))
-		ruling.hash.Write([]byte(ruling.Text))
+		hash.Write([]byte(ruling.Date))
+		hash.Write([]byte(ruling.Text))
 
+        ruling.hash = hashToHexString(hash)
 		ruling.hashValid = true
 	}
 

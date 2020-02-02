@@ -26,11 +26,9 @@ func GetSetHashAndIdFromDB(
 func InsertSetToDB(
         set *mtgcards.MTGSet,
         queries *DBInsertQueries) (int64, error) {
-    setHash := HashToHexString(set.Hash())
-
     // Insert the set itself
 	res, err := queries.InsertSetQuery.Exec(
-        setHash,
+        set.Hash(),
         set.BaseSetSize,
         set.Block,
 		set.Code,
@@ -94,12 +92,26 @@ func UpdateSetInDB(
         insertQueries *DBInsertQueries) error {
 
     // First, update the main set record
-    setHash := HashToHexString(set.Hash())
-	_, err := updateQueries.UpdateSetQuery.Exec(setHash, set.BaseSetSize, set.Block,
-		set.Code, set.IsForeignOnly, set.IsFoilOnly, set.IsOnlineOnly,
-		set.IsPartialPreview, set.KeyruneCode, set.MCMName, set.MCMId, set.MTGOCode,
-		set.Name, set.ParentCode, set.ReleaseDate, set.TCGPlayerGroupId,
-		set.TotalSetSize, set.Type, setId)
+	_, err := updateQueries.UpdateSetQuery.Exec(
+        set.Hash(),
+        set.BaseSetSize,
+        set.Block,
+		set.Code,
+        set.IsForeignOnly,
+        set.IsFoilOnly,
+        set.IsOnlineOnly,
+		set.IsPartialPreview,
+        set.KeyruneCode,
+        set.MCMName,
+        set.MCMId,
+        set.MTGOCode,
+		set.Name,
+        set.ParentCode,
+        set.ReleaseDate,
+        set.TCGPlayerGroupId,
+		set.TotalSetSize,
+        set.Type,
+        setId)
 	if err != nil {
 		return err
 	}

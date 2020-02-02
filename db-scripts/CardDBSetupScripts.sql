@@ -64,6 +64,35 @@ CREATE TABLE mtg_cards.all_cards (
 	INDEX name_index (name)
 ) DEFAULT COLLATE utf8mb4_bin;
 
+CREATE TABLE mtg_cards.all_tokens (
+	token_id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+	uuid CHAR(36) NOT NULL,
+	token_hash CHAR(32) NOT NULL,
+	artist VARCHAR(100) NOT NULL COLLATE utf8mb4_general_ci, #Max existing len: 54
+	border_color VARCHAR(30) NOT NULL COLLATE utf8mb4_general_ci, #Max existing len: 10
+	card_number VARCHAR(20) NOT NULL COLLATE utf8mb4_general_ci, #Max existing len: 9
+	card_power VARCHAR(10) NOT NULL COLLATE utf8mb4_general_ci, #Max existing len: 3
+	card_type VARCHAR(100) NOT NULL COLLATE utf8mb4_general_ci, #Max existing len: 46
+	color_identity SET('B', 'G', 'R', 'U', 'W') NULL,
+	color_indicator SET('B', 'G', 'R', 'U', 'W') NULL,
+	colors SET('B', 'G', 'R', 'U', 'W') NULL,
+	is_online_only BOOLEAN NOT NULL DEFAULT FALSE,
+	layout VARCHAR(25) NOT NULL COLLATE utf8mb4_general_ci, #Max existing len: 9
+	loyalty VARCHAR(20) NULL COLLATE utf8mb4_general_ci, #Max existing len: 5
+	name VARCHAR(500) NULL COLLATE utf8mb4_general_ci, #Max existing len: 141
+	scryfall_id CHAR(36) NOT NULL,
+	scryfall_illustration_id CHAR(36) NULL,
+	scryfall_oracle_id CHAR(36) NOT NULL,
+	set_id INT NOT NULL,
+	side CHAR(1) NULL,
+	text VARCHAR(1500) NOT NULL COLLATE utf8mb4_general_ci, #Max existing len: 770
+	toughness VARCHAR(10) NOT NULL COLLATE utf8mb4_general_ci, #Max existing len: 3
+	watermark VARCHAR(50) NOT NULL COLLATE utf8mb4_general_ci, #Max existing len: 21
+	UNIQUE INDEX uuid_index (uuid),
+	INDEX token_hash_index (token_hash),
+	INDEX name_index (name)
+) DEFAULT COLLATE utf8mb4_bin;
+
 CREATE TABLE mtg_cards.frame_effect_options (
 	frame_effect_option_id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
 	frame_effect_option VARCHAR(50) NOT NULL COLLATE utf8mb4_general_ci #Max existing len: 22
@@ -160,15 +189,21 @@ CREATE TABLE mtg_cards.base_type_options (
 INSERT INTO mtg_cards.base_type_options
 (base_type_option)
 VALUES
-("Creature"), ("Sorcery"), ("Instant"), ("Land"), ("Planeswalker"), ("Artifact"),
-("Enchantment"), ("Tribal"), ("Scheme"), ("Hero"), ("Eaturecray"), ("Summon"),
-("Plane"), ("Phenomenon"), ("Autobot"), ("Character"), ("Vanguard"), ("Conspiracy"),
-("Scariest"), ("You'll"), ("Ever"), ("See"), ("instant"), ("Wolf"), ("Elemental"),
-("Specter");
+("Artifact"), ("Autobot"), ("Card"), ("Character"), ("Conspiracy"), ("Creature"),
+("Eaturecray"), ("Elemental"), ("Elite"), ("Emblem"), ("Enchantment"), ("Ever"),
+("Hero"), ("Instant"), ("Land"), ("Phenomenon"), ("Plane"), ("Planeswalker"),
+("Scariest"), ("Scheme"), ("See"), ("Sorcery"), ("Specter"), ("Summon"),
+("Token"), ("Tribal"), ("Vanguard"), ("Wolf"), ("You’ll"), ("instant");
 
-CREATE TABLE mtg_cards.base_types (
+CREATE TABLE mtg_cards.card_base_types (
 	base_type_id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
 	card_id INT NOT NULL,
+	base_type_option_id INT NOT NULL
+) DEFAULT COLLATE utf8mb4_bin;
+
+CREATE TABLE mtg_cards.token_base_types (
+	base_type_id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+	token_id INT NOT NULL,
 	base_type_option_id INT NOT NULL
 ) DEFAULT COLLATE utf8mb4_bin;
 
@@ -234,74 +269,88 @@ CREATE TABLE mtg_cards.card_subtype_options (
 INSERT INTO mtg_cards.card_subtype_options
 (subtype_option)
 VALUES
-("Mammoth"), ("Beast"), ("Domri"), ("Wraith"), ("Gorgon"), ("Kinshala"), ("Licid"),
-("Kangaroo"), ("Devil"), ("Monger"), ("Arkhos"), ("Brushwagg"), ("Igpay"), ("Hero"),
-("Head"), ("Human"), ("Rhino"), ("Warrior"), ("Tezzeret"), ("Samurai"), ("Angrath"),
-("Spawn"), ("Xenagos"), ("Construct"), ("Soldier"), ("Centaur"), ("Horse"), ("Food"),
-("Kithkin"), ("Dack"), ("Wrestler"), ("Paratrooper"), ("Fire"), ("Juggernaut"),
-("Antelope"), ("Pirate"), ("Ral"), ("Nastiest,"), ("Brainiac"), ("Davriel"),
-("Illusion"), ("Cockatrice"), ("Curse"), ("Hound"), ("Ape"), ("Vraska"),
-("Valla"), ("Vampire"), ("Ooze"), ("Demon"), ("Pegasus"), ("Clamfolk"), ("Forest"),
-("Shade"), ("Slith"), ("Rigger"), ("Ir"), ("Koth"), ("Specter"), ("Oko"),
-("Tamiyo"), ("Chicken"), ("Sphinx"), ("Phelddagrif"), ("Orgg"), ("Alicorn"),
-("Reflection"), ("Spider"), ("Archon"), ("Djinn"), ("God"), ("Drone"), ("Tibalt"),
-("Vampyre"), ("Freyalise"), ("Equipment"), ("Boar"), ("Monk"), ("Basilisk"),
-("Aetherborn"), ("Azra"), ("Regatha"), ("Processor"), ("Dungeon"), ("Jellyfish"),
-("Adventure"), ("Mercenary"), ("Daretti"), ("Skeleton"), ("Garruk"), ("Bolas"),
-("Sponge"), ("Donkey"), ("Mime"), ("Elemental"), ("Ogre"), ("Viashino"),
-("Nightstalker"), ("Bear"), ("Lamia"), ("Angel"), ("Whale"), ("Ugin"), ("Hatificer"),
-("Homunculus"), ("Scout"), ("Dog"), ("Drake"), ("Orc"), ("Noggle"), ("Moag"),
-("Power-Plant"), ("Gamer"), ("Citizen"), ("Tower"), ("Crocodile"), ("Giant"),
-("Trap"), ("Luvion"), ("Muraganda"), ("Nephilim"), ("Cephalid"), ("The"),
-("Designer"), ("Duck"), ("Equilor"), ("Deer"), ("Avatar"), ("Manticore"),
-("Townsfolk"), ("Horror"), ("Treefolk"), ("Windgrace"), ("Rath"), ("of"), ("Swamp"),
-("Berserker"), ("Wolf"), ("Yeti"), ("Squid"), ("Goat"), ("Teyo"), ("Iquatana"),
-("Lizard"), ("Will"), ("Myr"), ("Lhurgoyf"), ("Nomad"), ("Cartouche"), ("Zendikar"),
-("Ulgrotha"), ("Wombat"), ("Spy"), ("Monkey"), ("Starfish"), ("Kephalai"),
-("Shrine"), ("Cloud"), ("Bat"), ("Mutant"), ("Elspeth"), ("Kamigawa"), ("Karsus"),
-("Shandalar"),("Druid"), ("Dinosaur"), ("Crab"), ("Scarecrow"), ("Elk"), ("Chimera"),
-("Mongoose"), ("Sable"), ("Lobster"), ("Surrakar"), ("Desert"), ("Nautilus"),
-("Dominaria"), ("Gideon"), ("Mirrodin"), ("Dreadnought"), ("Homarid"), ("Kavu"),
-("Pangolin"), ("Saga"), ("Rebel"), ("Oyster"), ("Lammasu"), ("Gate"), ("Vehicle"),
-("Kor"), ("Estrid"), ("Trilobite"), ("Ravnica"), ("Wildfire"), ("Imp"),
-("Flagbearer"), ("Beeble"), ("Elves"), ("Lady"), ("Rogue"), ("Rowan"), ("Lair"),
-("Child"), ("Fish"), ("Ajani"), ("Chandra"), ("Kirin"), ("Bringer"), ("Zombie"),
-("Spirit"), ("Faerie"), ("Teferi"), ("Urza"), ("Elder"), ("Wrenn"), ("Jaya"),
-("Cyborg"), ("Elemental?"), ("Abian"), ("Dragon"), ("Vedalken"), ("Wurm"),
-("Unicorn"), ("Ally"), ("Penguin"), ("Liliana"), ("Ouphe"), ("Aurochs"), ("Fabacin"),
-("Mode"), ("Goblin"), ("Soltari"), ("Hag"), ("Octopus"), ("Worm"), ("Saheeli"),
-("Locus"), ("Master"), ("Rat"), ("Artificer"), ("Assembly-Worker"), ("Praetor"),
-("Samut"), ("Biggest,"), ("Kasmina"), ("Spike"), ("Shaman"), ("Turtle"),
-("Incarnation"), ("Eldrazi"), ("Gremlin"), ("Hyena"), ("Hippo"),
-("Bolas’s Meditation Realm"), ("Rabbit"), ("Kobold"), ("and/or"), ("Advisor"),
-("Elephant"), ("Kiora"), ("Hellion"), ("Carrier"), ("Rabiah"), ("Vryn"), ("Thrull"),
-("Wolverine"), ("Camel"), ("Aminatou"), ("Yanling"), ("Wizard"), ("Insect"),
-("Spellshaper"), ("Atog"), ("Segovia"), ("Demigod"), ("Beaver"), ("Knight"),
-("Elf"), ("Arlinn"), ("Arcane"), ("Pyrulea"), ("Mongseng"), ("Shadowmoor"),
-("Bureaucrat"), ("Werewolf"), ("Harpy"), ("Sheep"), ("Kaya"), ("Kolbahan"),
-("Phyrexia"), ("Autobot"), ("Gargoyle"), ("Phoenix"), ("Noble"), ("Siren"),
-("Naga"), ("Alien"), ("Griffin"), ("Nahiri"), ("Narset"), ("Calix"), ("Waiter"),
-("Island"), ("Cleric"), ("Jackal"), ("Serra’s Realm"), ("Leech"), ("Urza’s"),
-("Legend"), ("Frog"), ("Hydra"), ("Assassin"), ("Moonfolk"), ("Venser"), ("Killbot"),
-("Minotaur"), ("Azgol"), ("Ferret"), ("Sarkhan"), ("Shapeshifter"), ("Sorin"),
-("Barbarian"), ("Dovin"),("Lorwyn"), ("Ergamon"), ("Archer"), ("Nymph"),
-("Kaldheim"), ("Villain"), ("Zubera"), ("Fox"), ("Karn"), ("Xerex"), ("Etiquette"),
-("Yanggu"), ("Squirrel"), ("Mystic"), ("Scientist"), ("Gnome"), ("Serpent"),
-("Mole"), ("Nixilis"), ("Alara"), ("New Phyrexia"), ("Raccoon"), ("Key"),
-("Belenon"), ("Merfolk"), ("Ox"), ("Troll"), ("Peasant"), ("Plant"), ("Efreet"),
-("Serra"), ("Thalakos"), ("Jace"), ("Satyr"), ("Minion"), ("Kyneth"), ("Gus"),
-("Contraption"), ("Beholder"), ("Innistrad"), ("Golem"), ("Nightmare"),
-("Warlock"), ("Kraken"), ("Ninja"), ("Fortification"), ("Hippogriff"), ("Bot"),
-("Baddest,"), ("Plains"), ("Wall"), ("Fungus"), ("Eye"), ("Volver"), ("Cow"),
-("Ashiok"), ("Pest"), ("Leviathan"), ("Cat"), ("Sliver"), ("Salamander"), ("Weird"),
-("Dauthi"), ("Vivien"), ("Mummy"), ("Egg"), ("Dryad"), ("Slug"), ("Scorpion"),
-("Thopter"), ("Metathran"), ("Ship"), ("Masticore"), ("Inzerva"), ("Mercadia"),
-("Phyrexian"), ("Bird"), ("Mountain"), ("Snake"), ("Dwarf"), ("Badger"), ("Pilot"),
-("Aura"), ("Cyclops"), ("Nissa"), ("Huatli"), ("Mine"), ("Proper");
+("Abian"), ("Adventure"), ("Advisor"), ("Aetherborn"), ("Ajani"), ("Alara"),
+("Alicorn"), ("Alien"), ("Ally"), ("Aminatou"), ("Angel"), ("Angrath"),
+("Antelope"), ("Ape"), ("Arcane"), ("Archer"), ("Archon"), ("Arkhos"),
+("Arlinn"), ("Army"), ("Artificer"), ("Ashiok"), ("Assassin"), ("Assembly-Worker"),
+("Atog"), ("Aura"), ("Aurochs"), ("Autobot"), ("Avatar"), ("Azgol"),
+("Azra"), ("Baddest,"), ("Badger"), ("Barbarian"), ("Basilisk"), ("Bat"),
+("Bear"), ("Beast"), ("Beaver"), ("Beeble"), ("Beholder"), ("Belenon"),
+("Berserker"), ("Biggest,"), ("Bird"), ("Boar"), ("Bolas"), ("Bolas’s Meditation Realm"),
+("Bot"), ("Brainiac"), ("Bringer"), ("Brushwagg"), ("Bureaucrat"), ("Calix"),
+("Camel"), ("Carrier"), ("Cartouche"), ("Cat"), ("Centaur"), ("Cephalid"),
+("Chandra"), ("Chicken"), ("Child"), ("Chimera"), ("Citizen"), ("Clamfolk"),
+("Cleric"), ("Cloud"), ("Clue"), ("Cockatrice"), ("Construct"), ("Contraption"),
+("Cow"), ("Crab"), ("Crocodile"), ("Curse"), ("Cyborg"), ("Cyclops"),
+("Dack"), ("Daretti"), ("Dauthi"), ("Davriel"), ("Deer"), ("Demigod"),
+("Demon"), ("Desert"), ("Designer"), ("Devil"), ("Dinosaur"), ("Djinn"),
+("Dog"), ("Dominaria"), ("Domri"), ("Donkey"), ("Dovin"), ("Dragon"),
+("Drake"), ("Dreadnought"), ("Drone"), ("Druid"), ("Dryad"), ("Duck"),
+("Dungeon"), ("Dwarf"), ("Efreet"), ("Egg"), ("Elder"), ("Eldrazi"),
+("Elemental"), ("Elemental?"), ("Elephant"), ("Elf"), ("Elk"), ("Elspeth"),
+("Elves"), ("Equilor"), ("Equipment"), ("Ergamon"), ("Estrid"), ("Etiquette"),
+("Eye"), ("Fabacin"), ("Faerie"), ("Ferret"), ("Fire"), ("Fish"),
+("Flagbearer"), ("Food"), ("Forest"), ("Fortification"), ("Fox"), ("Freyalise"),
+("Frog"), ("Fungus"), ("Gamer"), ("Gargoyle"), ("Garruk"), ("Gate"),
+("Germ"), ("Giant"), ("Gideon"), ("Gnome"), ("Goat"), ("Goblin"),
+("God"), ("Golem"), ("Gorgon"), ("Gremlin"), ("Griffin"), ("Gus"),
+("Hag"), ("Harpy"), ("Hatificer"), ("Head"), ("Hellion"), ("Hero"),
+("Hippo"), ("Hippogriff"), ("Homarid"), ("Homunculus"), ("Horror"), ("Horse"),
+("Hound"), ("Huatli"), ("Human"), ("Hydra"), ("Hyena"), ("Igpay"),
+("Illusion"), ("Imp"), ("Incarnation"), ("Innistrad"), ("Insect"), ("Inzerva"),
+("Iquatana"), ("Ir"), ("Island"), ("Jace"), ("Jackal"), ("Jaya"),
+("Jellyfish"), ("Juggernaut"), ("Kaldheim"), ("Kamigawa"), ("Kangaroo"), ("Karn"),
+("Karsus"), ("Kasmina"), ("Kavu"), ("Kaya"), ("Kephalai"), ("Key"),
+("Killbot"), ("Kinshala"), ("Kiora"), ("Kirin"), ("Kithkin"), ("Knight"),
+("Kobold"), ("Kolbahan"), ("Kor"), ("Koth"), ("Kraken"), ("Kyneth"),
+("Lady"), ("Lair"), ("Lamia"), ("Lammasu"), ("Leech"), ("Legend"),
+("Leviathan"), ("Lhurgoyf"), ("Licid"), ("Liliana"), ("Lizard"), ("Lobster"),
+("Locus"), ("Lorwyn"), ("Luvion"), ("Mammoth"), ("Manticore"), ("Master"),
+("Masticore"), ("Mercadia"), ("Mercenary"), ("Merfolk"), ("Metathran"), ("Mime"),
+("Mine"), ("Minion"), ("Minotaur"), ("Mirrodin"), ("Moag"), ("Mode"),
+("Mole"), ("Monger"), ("Mongoose"), ("Mongseng"), ("Monk"), ("Monkey"),
+("Moonfolk"), ("Mountain"), ("Mouse"), ("Mummy"), ("Muraganda"), ("Mutant"),
+("Myr"), ("Mystic"), ("Naga"), ("Nahiri"), ("Narset"), ("Nastiest,"),
+("Nautilus"), ("Nephilim"), ("New Phyrexia"), ("Nightmare"), ("Nightstalker"), ("Ninja"),
+("Nissa"), ("Nixilis"), ("Noble"), ("Noggle"), ("Nomad"), ("Nymph"),
+("Octopus"), ("Ogre"), ("Oko"), ("Ooze"), ("Orc"), ("Orgg"),
+("Ouphe"), ("Ox"), ("Oyster"), ("Pangolin"), ("Paratrooper"), ("Peasant"),
+("Pegasus"), ("Penguin"), ("Pentavite"), ("Pest"), ("Phelddagrif"), ("Phoenix"),
+("Phyrexia"), ("Phyrexian"), ("Pilot"), ("Pirate"), ("Plains"), ("Plant"),
+("Power-Plant"), ("Praetor"), ("Processor"), ("Proper"), ("Pyrulea"), ("Rabbit"),
+("Rabiah"), ("Raccoon"), ("Ral"), ("Rat"), ("Rath"), ("Ravnica"),
+("Rebel"), ("Reflection"), ("Regatha"), ("Reveler"), ("Rhino"), ("Rigger"),
+("Rogue"), ("Rowan"), ("Rukh"), ("Sable"), ("Saga"), ("Saheeli"),
+("Salamander"), ("Samurai"), ("Samut"), ("Saproling"), ("Sarkhan"), ("Satyr"),
+("Scarecrow"), ("Scientist"), ("Scion"), ("Scorpion"), ("Scout"), ("Sculpture"),
+("Segovia"), ("Serf"), ("Serpent"), ("Serra"), ("Serra’s Realm"), ("Servo"),
+("Shade"), ("Shadowmoor"), ("Shaman"), ("Shandalar"), ("Shapeshifter"), ("Sheep"),
+("Ship"), ("Shrine"), ("Siren"), ("Skeleton"), ("Slith"), ("Sliver"),
+("Slug"), ("Snake"), ("Soldier"), ("Soltari"), ("Sorin"), ("Spawn"),
+("Specter"), ("Spellshaper"), ("Sphinx"), ("Spider"), ("Spike"), ("Spirit"),
+("Sponge"), ("Spy"), ("Squid"), ("Squirrel"), ("Starfish"), ("Surrakar"),
+("Survivor"), ("Swamp"), ("Tamiyo"), ("Teferi"), ("Tentacle"), ("Teyo"),
+("Tezzeret"), ("Thalakos"), ("The"), ("Thopter"), ("Thrull"), ("Tibalt"),
+("Tower"), ("Townsfolk"), ("Trap"), ("Treasure"), ("Treefolk"), ("Trilobite"),
+("Triskelavite"), ("Troll"), ("Turtle"), ("Ugin"), ("Ulgrotha"), ("Unicorn"),
+("Urza"), ("Urza’s"), ("Valla"), ("Vampire"), ("Vampyre"), ("Vedalken"),
+("Vehicle"), ("Venser"), ("Viashino"), ("Villain"), ("Vivien"), ("Volver"),
+("Vraska"), ("Vryn"), ("Waiter"), ("Wall"), ("Warlock"), ("Warrior"),
+("Weird"), ("Werewolf"), ("Whale"), ("Wildfire"), ("Will"), ("Windgrace"),
+("Wizard"), ("Wolf"), ("Wolverine"), ("Wombat"), ("Worm"), ("Wraith"),
+("Wrenn"), ("Wrestler"), ("Wurm"), ("Xenagos"), ("Xerex"), ("Yanggu"),
+("Yanling"), ("Yeti"), ("Zendikar"), ("Zombie"), ("Zubera"), ("and/or"),
+("of");
 
 CREATE TABLE mtg_cards.card_subtypes (
 	subtype_id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
 	card_id INT NOT NULL,
+	subtype_option_id INT NOT NULL
+) DEFAULT COLLATE utf8mb4_bin;
+
+CREATE TABLE mtg_cards.token_subtypes (
+	subtype_id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+	token_id INT NOT NULL,
 	subtype_option_id INT NOT NULL
 ) DEFAULT COLLATE utf8mb4_bin;
 
@@ -313,11 +362,17 @@ CREATE TABLE mtg_cards.card_supertype_options (
 INSERT INTO mtg_cards.card_supertype_options
 (supertype_option)
 VALUES
-("Legendary"), ("Basic"), ("Snow"), ("Ongoing"), ("World");
+("Basic"), ("Host"), ("Legendary"), ("Ongoing"), ("Snow"), ("World");
 
 CREATE TABLE mtg_cards.card_supertypes (
 	supertype_id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
 	card_id INT NOT NULL,
+	supertype_option_id INT NOT NULL
+) DEFAULT COLLATE utf8mb4_bin;
+
+CREATE TABLE mtg_cards.token_supertypes (
+	supertype_id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+	token_id INT NOT NULL,
 	supertype_option_id INT NOT NULL
 ) DEFAULT COLLATE utf8mb4_bin;
 
@@ -337,4 +392,10 @@ CREATE TABLE mtg_cards.set_translations (
 	set_id INT NOT NULL,
 	set_translation_language_id INT NOT NULL,
 	set_translated_name VARCHAR(200) NOT NULL COLLATE utf8mb4_general_ci #Max existing len: 67
+) DEFAULT COLLATE utf8mb4_bin;
+
+CREATE TABLE mtg_cards.token_reverse_related (
+	reverse_related_id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+	token_id INT NOT NULL,
+	reverse_related_card VARCHAR(200) NOT NULL COLLATE utf8mb4_general_ci #Max existing len: 57
 ) DEFAULT COLLATE utf8mb4_bin;

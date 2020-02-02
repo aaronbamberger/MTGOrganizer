@@ -1,9 +1,16 @@
 package mtgcards
 
 import "encoding/binary"
+import "encoding/hex"
 import "hash"
 import "hash/fnv"
 import "sort"
+
+func hashToHexString(hashVal hash.Hash) string {
+    hashBytes := make([]byte, 0, hashVal.Size())
+    hashBytes = hashVal.Sum(hashBytes)
+    return hex.EncodeToString(hashBytes)
+}
 
 type MTGSet struct {
 	BaseSetSize int `json:"baseSetSize"`
@@ -23,36 +30,46 @@ type MTGSet struct {
 	ReleaseDate string `json:"releaseDate"`
 	TCGPlayerGroupId int `json:"tcgplayerGroupId"`
 	TotalSetSize int `json:"totalSetSize"`
+    Tokens []MTGToken `json:"tokens"`
 	Translations map[string]string `json:"translations"`
 	Type string `json:"type"`
-	hash hash.Hash
+
+	hash string
 	hashValid bool
 }
 
-func (set *MTGSet) Hash() hash.Hash {
+func (set *MTGSet) Hash() string {
 	if !set.hashValid {
-		set.hash = fnv.New128a()
-		binary.Write(set.hash, binary.BigEndian, set.BaseSetSize)
-		set.hash.Write([]byte(set.Block))
-		for _, card := range set.Cards {
-			cardHash := card.Hash()
-			cardHashBytes := make([]byte, 0, cardHash.Size())
-			set.hash.Write(cardHash.Sum(cardHashBytes))
+        hash := fnv.New128a()
+		binary.Write(hash, binary.BigEndian, set.BaseSetSize)
+		hash.Write([]byte(set.Block))
+
+        // Cards
+		for idx := range set.Cards {
+            card := &set.Cards[idx]
+            hash.Write([]byte(card.Hash()))
 		}
-		set.hash.Write([]byte(set.Code))
-		binary.Write(set.hash, binary.BigEndian, set.IsForeignOnly)
-		binary.Write(set.hash, binary.BigEndian, set.IsFoilOnly)
-		binary.Write(set.hash, binary.BigEndian, set.IsOnlineOnly)
-		binary.Write(set.hash, binary.BigEndian, set.IsPartialPreview)
-		set.hash.Write([]byte(set.KeyruneCode))
-		set.hash.Write([]byte(set.MCMName))
-		binary.Write(set.hash, binary.BigEndian, set.MCMId)
-		set.hash.Write([]byte(set.MTGOCode))
-		set.hash.Write([]byte(set.Name))
-		set.hash.Write([]byte(set.ParentCode))
-		set.hash.Write([]byte(set.ReleaseDate))
-		binary.Write(set.hash, binary.BigEndian, set.TCGPlayerGroupId)
-		binary.Write(set.hash, binary.BigEndian, set.TotalSetSize)
+
+        // Tokens
+        for idx := range set.Tokens {
+            token := &set.Tokens[idx]
+            hash.Write([]byte(token.Hash()))
+        }
+
+		hash.Write([]byte(set.Code))
+		binary.Write(hash, binary.BigEndian, set.IsForeignOnly)
+		binary.Write(hash, binary.BigEndian, set.IsFoilOnly)
+		binary.Write(hash, binary.BigEndian, set.IsOnlineOnly)
+		binary.Write(hash, binary.BigEndian, set.IsPartialPreview)
+		hash.Write([]byte(set.KeyruneCode))
+		hash.Write([]byte(set.MCMName))
+		binary.Write(hash, binary.BigEndian, set.MCMId)
+		hash.Write([]byte(set.MTGOCode))
+		hash.Write([]byte(set.Name))
+		hash.Write([]byte(set.ParentCode))
+		hash.Write([]byte(set.ReleaseDate))
+		binary.Write(hash, binary.BigEndian, set.TCGPlayerGroupId)
+		binary.Write(hash, binary.BigEndian, set.TotalSetSize)
 		// Since go maps don't have a defined iteration order,
 		// Ensure a repeatable hash by sorting the keyset, and using
 		// that to define the iteration order
@@ -62,10 +79,13 @@ func (set *MTGSet) Hash() hash.Hash {
 		}
 		sort.Strings(translationLangs)
 		for _, lang := range translationLangs {
-			set.hash.Write([]byte(lang))
-			set.hash.Write([]byte(set.Translations[lang]))
+			hash.Write([]byte(lang))
+			hash.Write([]byte(set.Translations[lang]))
 		}
-		set.hash.Write([]byte(set.Type))
+		hash.Write([]byte(set.Type))
+
+        set.hash = hashToHexString(hash)
+
 		set.hashValid = true
 	}
 
@@ -73,10 +93,32 @@ func (set *MTGSet) Hash() hash.Hash {
 }
 
 func (set *MTGSet) Canonicalize() {
-	sort.Sort(ByUUID(set.Cards))
+    // Cards
+	sort.Sort(CardByUUID(set.Cards))
 	for idx := range set.Cards {
         // Need to access by index here so we're updating the cards
         // themselves, not copies
 		set.Cards[idx].Canonicalize()
 	}
+
+    // Tokens
+    sort.Sort(TokenByUUID(set.Tokens))
+    for idx := range set.Tokens {
+        // Same as above
+        set.Tokens[idx].Canonicalize()
+    }
+}
+
+type CardByUUID []MTGCard
+
+func (cards CardByUUID) Len() int {
+	return len(cards)
+}
+
+func (cards CardByUUID) Less(i, j int) bool {
+	return cards[i].UUID < cards[j].UUID
+}
+
+func (cards CardByUUID) Swap(i, j int) {
+	cards[i], cards[j] = cards[j], cards[i]
 }

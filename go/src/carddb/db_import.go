@@ -2,17 +2,9 @@ package carddb
 
 import "context"
 import "database/sql"
-import "encoding/hex"
-import "hash"
 import "log"
 import "mtgcards"
 import "sync"
-
-func HashToHexString(hashVal hash.Hash) string {
-	hashBytes := make([]byte, 0, hashVal.Size())
-	hashBytes = hashVal.Sum(hashBytes)
-	return hex.EncodeToString(hashBytes)
-}
 
 func ImportSetsToDB(
         db *sql.DB,
@@ -103,7 +95,7 @@ func maybeInsertSetToDb(
 
 	// Hash the set for later use
 	set.Canonicalize()
-	setHash := HashToHexString(set.Hash())
+	setHash := set.Hash()
 
     setGetQueries := getQueries.ForTx(setTx)
 
@@ -124,6 +116,14 @@ func maybeInsertSetToDb(
 	totalExistingCards := 0
 	totalExistingCardsHashSkipped := 0
 	totalExistingCardsUpdated := 0
+
+    totalTokens := 0
+    totalNewTokens := 0
+    totalNewTokensInNewSets := 0
+    totalNewTokensInExistingSets := 0
+    totalExistingTokens := 0
+    totalExistingTokensHashSkipped := 0
+    totalExistingTokensUpdated := 0
 
 	if setExists {
 		log.Printf("Set %s already exists in the database\n", set.Code)
@@ -191,7 +191,7 @@ func maybeInsertSetToDb(
 					totalNewCardsInExistingSets += 1
 				} else {
 					// Check if the stored hash matches
-					cardHash := HashToHexString(card.Hash())
+					cardHash := card.Hash()
 					if cardHash == cardDbHash {
 						// Can skip
 						log.Printf("Card %s hash matches in db (%s), skipping", card.Name, cardHash)
@@ -226,6 +226,83 @@ func maybeInsertSetToDb(
 					}
 				}
 			}
+
+			// For each token, check if the token exists, and if so, if the hash
+			// matches
+			for idx := range set.Tokens {
+                // Need to access by index here to get a pointer to the token,
+                // not a copy
+                token := &set.Tokens[idx]
+
+				// Transaction for each token
+				tokenTx, err := conn.BeginTx(ctx, nil)
+				if err != nil {
+					log.Print(err)
+					continue
+				}
+
+				tokenGetQueries := getQueries.ForTx(tokenTx)
+
+				tokenExists, tokenDbHash, tokenId, err := GetTokenHashAndIdFromDB(
+                    token.UUID,
+                    tokenGetQueries)
+				if err != nil {
+					log.Print(err)
+					tokenTx.Rollback()
+					continue
+				}
+
+				if !tokenExists {
+                    tokenInsertQueries := insertQueries.ForTx(tokenTx)
+                    err := InsertTokenToDB(token, setId, tokenInsertQueries)
+					if err != nil {
+						log.Print(err)
+						tokenTx.Rollback()
+						continue
+					}
+
+                    tokenTx.Commit()
+                    totalTokens += 1
+					totalNewTokens += 1
+					totalNewTokensInExistingSets += 1
+				} else {
+					// Check if the stored hash matches
+					tokenHash := token.Hash()
+					if tokenHash == tokenDbHash {
+						// Can skip
+						log.Printf("Token %s hash matches in db (%s), skipping", token.Name, tokenHash)
+                        tokenTx.Commit()
+                        totalTokens += 1
+                        totalExistingTokens += 1
+						totalExistingTokensHashSkipped += 1
+					} else {
+						// Need to update token
+						log.Printf("Token %s hash doesn't match (db: %s, token: %s), updating",
+							token.Name, tokenDbHash, tokenHash)
+
+                        tokenUpdateQueries := updateQueries.ForTx(tokenTx)
+                        tokenDeleteQueries := deleteQueries.ForTx(tokenTx)
+                        tokenInsertQueries := insertQueries.ForTx(tokenTx)
+                        err := UpdateTokenInDB(
+                            tokenId,
+                            setId,
+                            token,
+                            tokenUpdateQueries,
+                            tokenDeleteQueries,
+                            tokenInsertQueries)
+                        if err != nil {
+                            log.Print(err)
+                            tokenTx.Rollback()
+                            continue
+                        }
+                        tokenTx.Commit()
+                        totalTokens += 1
+                        totalExistingTokens += 1
+                        totalExistingTokensUpdated += 1
+					}
+				}
+			}
+
 		}
 		stats.AddToTotalExistingSets(1)
 	} else {
@@ -271,6 +348,37 @@ func maybeInsertSetToDb(
             totalNewCards += 1
 			totalNewCardsInNewSets += 1
 		}
+
+		// Insert all of the tokens in the set.  No need to check the full token hash, since we're bulk
+		// inserting the entire set
+		log.Printf("Processing tokens in set %s\n", set.Code)
+		for idx := range set.Tokens {
+            // Need to access by index here to get a pointer to the token,
+            // not a copy
+            token := &set.Tokens[idx]
+
+			// Transaction for each token
+			tokenTx, err := conn.BeginTx(ctx, nil)
+			if err != nil {
+				log.Print(err)
+				continue
+			}
+
+            tokenInsertQueries := insertQueries.ForTx(tokenTx)
+
+			err = InsertTokenToDB(token, setId, tokenInsertQueries)
+			if err != nil {
+				log.Print(err)
+				tokenTx.Rollback()
+				continue
+			}
+			tokenTx.Commit()
+
+            totalTokens += 1
+            totalNewTokens += 1
+			totalNewTokensInNewSets += 1
+		}
+
 	}
 
 	stats.AddToTotalCards(totalCards)
@@ -280,5 +388,12 @@ func maybeInsertSetToDb(
 	stats.AddToTotalExistingCards(totalExistingCards)
 	stats.AddToExistingCardsSkipped(totalExistingCardsHashSkipped)
 	stats.AddToExistingCardsUpdated(totalExistingCardsUpdated)
+    stats.AddToTotalTokens(totalTokens)
+    stats.AddToTotalNewTokens(totalNewTokens)
+    stats.AddToTotalNewTokensInNewSets(totalNewTokensInNewSets)
+    stats.AddToTotalNewTokensInExistingSets(totalNewTokensInExistingSets)
+    stats.AddToTotalExistingTokens(totalExistingTokens)
+    stats.AddToExistingTokensSkipped(totalExistingTokensHashSkipped)
+    stats.AddToExistingTokensUpdated(totalExistingTokensUpdated)
 	log.Printf("Done processing set %s\n", set.Code)
 }

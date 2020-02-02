@@ -120,11 +120,9 @@ func InsertCardToDB(
 		side.Valid = true
 	}
 
-    cardHash := HashToHexString(card.Hash())
-
 	res, err := queries.InsertCardQuery.Exec(
         card.UUID,
-        cardHash,
+        card.Hash(),
         card.Artist,
         card.BorderColor,
         card.Number,
@@ -299,9 +297,8 @@ func UpdateCardInDB(
 	}
 
     // First, update the main card record
-    cardHash := HashToHexString(card.Hash())
 	_, err := updateQueries.UpdateCardQuery.Exec(
-        cardHash,
+        card.Hash(),
         card.Artist,
         card.BorderColor,
         card.Number,

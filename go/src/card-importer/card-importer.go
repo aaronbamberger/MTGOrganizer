@@ -44,4 +44,14 @@ func main() {
         stats.ExistingCardsSkipped())
 	log.Printf("Existing cards updated due to hash mismatch: %d\n",
         stats.ExistingCardsUpdated())
+    log.Printf("Total tokens in update: %d\n", stats.TotalTokens())
+    log.Printf("Total new tokens: %d\n", stats.TotalNewTokens())
+    log.Printf("Total new tokens in new sets: %d\n", stats.TotalNewTokensInNewSets())
+    log.Printf("Total new tokens in existing sets: %d\n",
+        stats.TotalNewTokensInExistingSets())
+    log.Printf("Total existing tokens: %d\n", stats.TotalExistingTokens())
+    log.Printf("Existing tokens skipped due to hash match: %d\n",
+        stats.ExistingTokensSkipped())
+    log.Printf("Existing tokens updated due to hash mismatch: %d\n",
+        stats.ExistingTokensUpdated())
 }

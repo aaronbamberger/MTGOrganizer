@@ -28,6 +28,19 @@ type DBUpdateStats struct {
     totalExistingCards int
 	existingCardsSkipped int
 	existingCardsUpdated int
+
+    // Stats about tokens in the update
+    totalTokens int
+
+    // Stats about new tokens in the update
+    totalNewTokens int
+    totalNewTokensInNewSets int
+    totalNewTokensInExistingSets int
+
+    // Stats about existing tokens in the update
+    totalExistingTokens int
+    existingTokensSkipped int
+    existingTokensUpdated int
 }
 
 func (stats *DBUpdateStats) AddToTotalSets(delta int) {
@@ -102,6 +115,48 @@ func (stats *DBUpdateStats) AddToExistingCardsUpdated(delta int) {
     stats.existingCardsUpdated += delta
 }
 
+func (stats *DBUpdateStats) AddToTotalTokens(delta int) {
+    stats.mutex.Lock()
+    defer stats.mutex.Unlock()
+    stats.totalTokens += delta
+}
+
+func (stats *DBUpdateStats) AddToTotalNewTokens(delta int) {
+    stats.mutex.Lock()
+    defer stats.mutex.Unlock()
+    stats.totalNewTokens += delta
+}
+
+func (stats *DBUpdateStats) AddToTotalExistingTokens(delta int) {
+    stats.mutex.Lock()
+    defer stats.mutex.Unlock()
+    stats.totalExistingTokens += delta
+}
+
+func (stats *DBUpdateStats) AddToTotalNewTokensInNewSets(delta int) {
+    stats.mutex.Lock()
+    defer stats.mutex.Unlock()
+    stats.totalNewTokensInNewSets += delta
+}
+
+func (stats *DBUpdateStats) AddToTotalNewTokensInExistingSets(delta int) {
+    stats.mutex.Lock()
+    defer stats.mutex.Unlock()
+    stats.totalNewTokensInExistingSets += delta
+}
+
+func (stats *DBUpdateStats) AddToExistingTokensSkipped(delta int) {
+    stats.mutex.Lock()
+    defer stats.mutex.Unlock()
+    stats.existingTokensSkipped += delta
+}
+
+func (stats *DBUpdateStats) AddToExistingTokensUpdated(delta int) {
+    stats.mutex.Lock()
+    defer stats.mutex.Unlock()
+    stats.existingTokensUpdated += delta
+}
+
 func (stats *DBUpdateStats) TotalSets() int {
     stats.mutex.RLock()
     defer stats.mutex.RUnlock()
@@ -172,4 +227,46 @@ func (stats *DBUpdateStats) ExistingCardsUpdated() int {
     stats.mutex.RLock()
     defer stats.mutex.RUnlock()
     return stats.existingCardsUpdated
+}
+
+func (stats *DBUpdateStats) TotalTokens() int {
+    stats.mutex.RLock()
+    defer stats.mutex.RUnlock()
+    return stats.totalTokens
+}
+
+func (stats *DBUpdateStats) TotalNewTokens() int {
+    stats.mutex.RLock()
+    defer stats.mutex.RUnlock()
+    return stats.totalNewTokens
+}
+
+func (stats *DBUpdateStats) TotalExistingTokens() int {
+    stats.mutex.RLock()
+    defer stats.mutex.RUnlock()
+    return stats.totalExistingTokens
+}
+
+func (stats *DBUpdateStats) TotalNewTokensInNewSets() int {
+    stats.mutex.RLock()
+    defer stats.mutex.RUnlock()
+    return stats.totalNewTokensInNewSets
+}
+
+func (stats *DBUpdateStats) TotalNewTokensInExistingSets() int {
+    stats.mutex.RLock()
+    defer stats.mutex.RUnlock()
+    return stats.totalNewTokensInExistingSets
+}
+
+func (stats *DBUpdateStats) ExistingTokensSkipped() int {
+    stats.mutex.RLock()
+    defer stats.mutex.RUnlock()
+    return stats.existingTokensSkipped
+}
+
+func (stats *DBUpdateStats) ExistingTokensUpdated() int {
+    stats.mutex.RLock()
+    defer stats.mutex.RUnlock()
+    return stats.existingTokensUpdated
 }

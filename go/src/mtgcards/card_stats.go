@@ -1,6 +1,7 @@
 package mtgcards
 
 import "fmt"
+import "sort"
 import "unicode"
 
 func DevelopmentStats(sets map[string]MTGSet) {
@@ -95,8 +96,9 @@ func DevelopmentStats(sets map[string]MTGSet) {
 	maxToughnessLen := 0
 	maxTypeLen := 0
 	maxWatermarkLen := 0
+    maxTokenReverseRelatedNameLen := 0
 	nonAsciiNameCharsMap := make(map[rune]int)
-	baseTypes := make([]string, 0)
+	uniqueBaseTypes := make(map[string]bool)
 	uniqueSubtypes := make(map[string]bool)
 	uniqueSupertypes := make(map[string]bool)
 
@@ -133,6 +135,48 @@ func DevelopmentStats(sets map[string]MTGSet) {
 		if len(set.Type) > maxSetTypeLen {
 			maxSetTypeLen = len(set.Type)
 		}
+
+        for _, token := range set.Tokens {
+            for _, reverseRelated := range token.ReverseRelated {
+                if len(reverseRelated) > maxTokenReverseRelatedNameLen {
+                    maxTokenReverseRelatedNameLen = len(reverseRelated)
+                }
+            }
+
+            for _, subtype := range token.Subtypes {
+				if _, ok := uniqueSubtypes[subtype]; !ok {
+					uniqueSubtypes[subtype] = true
+				}
+			}
+
+			for _, supertype := range token.Supertypes {
+				if _, ok := uniqueSupertypes[supertype]; !ok {
+					uniqueSupertypes[supertype] = true
+				}
+			}
+
+            for _, tokenType := range token.Types {
+				var inSubtype, inSupertype bool
+				for _, subtype := range token.Subtypes {
+					if subtype == tokenType {
+						inSubtype = true
+						break
+					}
+				}
+				for _, supertype := range token.Supertypes {
+					if supertype == tokenType {
+						inSupertype = true
+						break
+					}
+				}
+				if !inSubtype && !inSupertype {
+                    if _, ok := uniqueBaseTypes[tokenType]; !ok {
+                        uniqueBaseTypes[tokenType] = true
+                    }
+				}
+			}
+
+        }
 
 		for _, card := range set.Cards {
 			if len(card.Artist) > maxArtistLen {
@@ -270,17 +314,9 @@ func DevelopmentStats(sets map[string]MTGSet) {
 					}
 				}
 				if !inSubtype && !inSupertype {
-					inBasetypes := false
-					for _, baseType := range baseTypes {
-						if cardType == baseType {
-							inBasetypes = true
-							break
-						}
-					}
-
-					if !inBasetypes {
-						baseTypes = append(baseTypes, cardType)
-					}
+                    if _, ok := uniqueBaseTypes[cardType]; !ok {
+                        uniqueBaseTypes[cardType] = true
+                    }
 				}
 			}
 
@@ -342,37 +378,62 @@ func DevelopmentStats(sets map[string]MTGSet) {
 	fmt.Printf("Max type len: %d\n", maxTypeLen)
 	fmt.Printf("Max watermark len: %d\n", maxWatermarkLen)
 
+    fmt.Printf("Max token reverse related: %d\n", maxTokenReverseRelatedNameLen)
+
 	fmt.Printf("Non ASCII characters appearing in card names:\n")
 	for character, occurences := range nonAsciiNameCharsMap {
 		fmt.Printf("\t%c (%d): %d\n", character, character, occurences)
 	}
 
-	fmt.Printf("Card base types:\n")
-	for _, baseType := range baseTypes {
-		fmt.Printf("\t%s\n", baseType)
-	}
-
-	// Dump the subtypes and supertypes in a format suitable for inserting
+	// Dump the subtypes, supertypes, and base types in a format suitable for inserting
 	// into a sql database, so I don't have to type them all in manually
+    // Subtypes
+    subtypes := make([]string, 0, len(uniqueSubtypes))
+    for subtype, _ := range uniqueSubtypes {
+        subtypes = append(subtypes, subtype)
+    }
+    sort.Strings(subtypes)
 	fmt.Printf("Subtypes:\n")
-	currentCount := 0
-	for subtype, _ := range uniqueSubtypes {
-		if currentCount % 5 == 0 {
+	for idx, subtype := range subtypes {
+		if idx % 6 == 0 {
 			fmt.Printf("\n")
 		}
 		fmt.Printf("(\"%s\"), ", subtype)
-		currentCount += 1
 	}
+    fmt.Println()
+    fmt.Printf("Total unique subtypes: %d\n", len(subtypes))
+
+    // Supertypes
+    supertypes := make([]string, 0, len(uniqueSupertypes))
+    for supertype, _ := range uniqueSupertypes {
+        supertypes = append(supertypes, supertype)
+    }
+    sort.Strings(supertypes)
 	fmt.Printf("Supertypes:\n")
-	currentCount = 0
-	for supertype, _ := range uniqueSupertypes {
-		if currentCount % 5 == 0 {
+	for idx, supertype := range supertypes {
+		if idx % 6 == 0 {
 			fmt.Printf("\n")
 		}
 		fmt.Printf("(\"%s\"), ", supertype)
-		currentCount += 1
 	}
+    fmt.Println()
+    fmt.Printf("Total unique supertypes: %d\n", len(supertypes))
 
+    // Base types
+    baseTypes := make([]string, 0, len(uniqueBaseTypes))
+    for baseType, _ := range uniqueBaseTypes {
+        baseTypes = append(baseTypes, baseType)
+    }
+    sort.Strings(baseTypes)
+	fmt.Printf("Base types:\n")
+	for idx, baseType := range baseTypes {
+		if idx % 6 == 0 {
+			fmt.Printf("\n")
+		}
+		fmt.Printf("(\"%s\"), ", baseType)
+	}
+    fmt.Println()
+    fmt.Printf("Total unique base types: %d\n", len(baseTypes))
 
 	/*
 	colorIdentityMap := make(map[string]int)
