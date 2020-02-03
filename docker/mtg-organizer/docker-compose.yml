@@ -4,7 +4,7 @@ services:
         image: "mariadb:latest"
         command: --max-connections 1000 --innodb-lock-wait-timeout 300 --max-prepared-stmt-count 50000
         volumes:
-            - /bagner_data/Projects/MTGOrganizer/db:/var/lib/mysql
+            - /bagner_data/Projects/MTGOrganizer/db/mariadb:/var/lib/mysql
         environment:
             MYSQL_ROOT_PASSWORD: db_password
             MYSQL_DATABASE: mtg_cards
@@ -18,3 +18,15 @@ services:
             PMA_HOST: card_db
             PMA_USER: app_user
             PMA_PASSWORD: app_db_password
+    card_prices_db:
+        image: "influxdb:latest"
+        volumes:
+            - /bagner_data/Projects/MTGOrganizer/db/influxdb:/var/lib/influxdb
+        ports:
+            - "8086:8086"
+        environment:
+            INFLUXDB_DB: mtg_cards
+            INFLUXDB_ADMIN_USER: admin_user
+            INFLUXDB_ADMIN_PASSWORD: admin_password
+            INFLUXDB_USER: app_user
+            INFLUXDB_USER_PASSWORD: app_db_password

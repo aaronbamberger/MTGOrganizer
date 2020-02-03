@@ -27,7 +27,7 @@ func GetTokenHashAndIdFromDB(
 func InsertTokenToDB(
         token *mtgcards.MTGToken,
         setId int64,
-        queries *DBInsertQueries) error {
+        queries *DBInsertQueries) (bool, error) {
 	// Build all of the values that can be null
     var colorIdentity sql.NullString
 	var colorIndicator sql.NullString
@@ -97,21 +97,33 @@ func InsertTokenToDB(
 		token.Watermark)
 
 	if err != nil {
-		return err
+		return false, err
 	}
+
+    // Since duplicate tokens are expected, it's possible that the insert query
+    // doesn't actually insert anything (the query is written so a duplicate
+    // insertion is a no-op).  For an existing token, we don't want to insert
+    // the other token data, so bail out early if this is the case
+    rowsAffected, err := res.RowsAffected()
+    if err != nil {
+        return false, err
+    }
+    if rowsAffected == 0 {
+        return false, nil
+    }
 
 	tokenId, err := res.LastInsertId()
 	if err != nil {
-		return err
+		return false, err
 	}
 
     // Now, insert all of the token data that doesn't live in the all_tokens table
     err = InsertOtherTokenDataToDB(tokenId, token, queries)
     if err != nil {
-        return nil
+        return false, err
     }
 
-	return nil
+	return true, nil
 }
 
 func UpdateTokenInDB(

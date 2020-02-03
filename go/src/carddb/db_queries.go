@@ -307,13 +307,17 @@ func (queries *DBInsertQueries) Prepare(db *sql.DB) error {
 		return err
 	}
 
+    // Since multiple sets might have the same token, we treat trying to insert
+    // an existing token as expected, and just do nothing if we try and insert
+    // a duplicate token
     queries.InsertTokenQuery, err = db.Prepare(`INSERT INTO all_tokens
         (uuid, token_hash, artist, border_color, card_number, card_power,
         card_type, color_identity, color_indicator, colors, is_online_only,
         layout, loyalty, name, scryfall_id, scryfall_illustration_id,
         scryfall_oracle_id, set_id, side, text, toughness, watermark)
         VALUES
-        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE uuid=uuid`)
     if err != nil {
         return err
     }

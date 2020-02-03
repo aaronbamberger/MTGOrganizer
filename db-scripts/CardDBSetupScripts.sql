@@ -399,3 +399,17 @@ CREATE TABLE mtg_cards.token_reverse_related (
 	token_id INT NOT NULL,
 	reverse_related_card VARCHAR(200) NOT NULL COLLATE utf8mb4_general_ci #Max existing len: 57
 ) DEFAULT COLLATE utf8mb4_bin;
+
+CREATE TABLE mtg_cards.last_updates (
+	last_card_update DATE NOT NULL,
+	last_prices_update DATE NOT NULL,
+	last_mtgjson_version_major INT NOT NULL,
+	last_mtgjson_version_minor INT NOT NULL,
+	last_mtgjson_version_patch INT NOT NULL
+) DEFAULT COLLATE utf8mb4_bin;
+
+INSERT INTO mtg_cards.last_updates
+(last_card_update, last_prices_update, last_mtgjson_version_major,
+last_mtgjson_version_minor, last_mtgjson_version_patch)
+VALUES
+("1000-01-01", "1000-01-01", 0, 0, 0);

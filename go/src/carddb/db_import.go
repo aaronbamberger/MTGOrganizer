@@ -254,7 +254,7 @@ func maybeInsertSetToDb(
 
 				if !tokenExists {
                     tokenInsertQueries := insertQueries.ForTx(tokenTx)
-                    err := InsertTokenToDB(token, setId, tokenInsertQueries)
+                    inserted, err := InsertTokenToDB(token, setId, tokenInsertQueries)
 					if err != nil {
 						log.Print(err)
 						tokenTx.Rollback()
@@ -262,9 +262,11 @@ func maybeInsertSetToDb(
 					}
 
                     tokenTx.Commit()
-                    totalTokens += 1
-					totalNewTokens += 1
-					totalNewTokensInExistingSets += 1
+                    if inserted {
+                        totalTokens += 1
+					    totalNewTokens += 1
+					    totalNewTokensInExistingSets += 1
+                    }
 				} else {
 					// Check if the stored hash matches
 					tokenHash := token.Hash()
@@ -366,7 +368,7 @@ func maybeInsertSetToDb(
 
             tokenInsertQueries := insertQueries.ForTx(tokenTx)
 
-			err = InsertTokenToDB(token, setId, tokenInsertQueries)
+            inserted, err := InsertTokenToDB(token, setId, tokenInsertQueries)
 			if err != nil {
 				log.Print(err)
 				tokenTx.Rollback()
@@ -374,9 +376,11 @@ func maybeInsertSetToDb(
 			}
 			tokenTx.Commit()
 
-            totalTokens += 1
-            totalNewTokens += 1
-			totalNewTokensInNewSets += 1
+            if inserted {
+                totalTokens += 1
+                totalNewTokens += 1
+			    totalNewTokensInNewSets += 1
+            }
 		}
 
 	}
