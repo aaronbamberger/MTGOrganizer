@@ -1,16 +1,33 @@
 package main
 
-import "database/sql"
+//import "database/sql"
 import _ "github.com/go-sql-driver/mysql"
 import "log"
 import "mtgcards"
-import "carddb"
+//import "carddb"
 
 func main() {
+    allPrices, err := mtgcards.DownloadAllPrices(true)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    log.Printf("Num prices: %d\n", len(allPrices))
+
+    count := 0
+    for uuid, prices := range allPrices {
+        log.Printf("UUID: %s, Prices: %v", uuid, prices)
+        count += 1
+        if count > 5 {
+            break
+        }
+    }
+
+    /*
 	allSets, err := mtgcards.DownloadAllPrintings(true)
 	if err != nil {
 		log.Fatal(err)
-	}
+    }
 
 	// Connect to the database
 	db, err := sql.Open("mysql", "app_user:app_db_password@tcp(172.18.0.2)/mtg_cards")
@@ -54,4 +71,5 @@ func main() {
         stats.ExistingTokensSkipped())
     log.Printf("Existing tokens updated due to hash mismatch: %d\n",
         stats.ExistingTokensUpdated())
+    */
 }

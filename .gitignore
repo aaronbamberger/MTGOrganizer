@@ -2,8 +2,7 @@ db/
 *.swp
 go/src/card-importer/card-importer
 go/src/card-stats/card-stats
-AllPrintings.json
-AllPrintings.json.gz
-AllPrintings.json.bz2
+AllPrintings.*
+AllPrices.*
 go/pkg/
 go/src/github.com/

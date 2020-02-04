@@ -11,94 +11,139 @@ import "os"
 
 const (
 	mtgjsonBaseUrl = "https://www.mtgjson.com/files/"
-	allPrintingsRawJson = "AllPrintings.json"
-	allPrintingsBz2 = "AllPrintings.json.bz2"
-	allPrintingsGz = "AllPrintings.json.gz"
+    allPrintingsUrl = "AllPrintings"
+    allPricesUrl = "AllPrices"
+)
+
+const (
+    jsonExt = ".json"
+    bz2Ext = ".bz2"
+    gzExt = ".gz"
 )
 
 func DownloadAllPrintings(useCachedIfAvailable bool) (map[string]MTGSet, error) {
-	// Go down the priority list of file types (gz, bz2, zip, raw),
-	// optionally trying to load them from files already downloaded
-	// to disk
+    result, err := downloadData(
+        useCachedIfAvailable,
+        allPrintingsUrl,
+        decodeSets)
+    if err != nil {
+        return nil, err
+    }
 
-	// Try gzip
-	allSets, err := TryGz(useCachedIfAvailable)
-	if err == nil {
-		return allSets, nil
-	}
-	log.Print(err)
-
-	// Try bz2
-	allSets, err = TryBz2(useCachedIfAvailable)
-	if err == nil {
-		return allSets, nil
-	}
-	log.Print(err)
-
-	// Try raw json
-	allSets, err = TryRaw(useCachedIfAvailable)
-	if err == nil {
-		return allSets, nil
-	}
-	log.Print(err)
-
-	return nil, fmt.Errorf("Unable to get card info from any sources")
+    if resultCast, ok := result.(map[string]MTGSet); !ok {
+        return nil, fmt.Errorf("Unable to convert all printings result to correct type")
+    } else {
+        return resultCast, nil
+    }
 }
 
-func TryGz(useCachedIfAvailable bool) (map[string]MTGSet, error) {
-	reader, err := TryDownload(allPrintingsGz, useCachedIfAvailable)
-	if err != nil {
-		return nil, err
-	}
-	defer reader.Close()
+func DownloadAllPrices(useCachedIfAvailable bool) (map[string]MTGCardPrices, error) {
+    result, err := downloadData(
+        useCachedIfAvailable,
+        allPricesUrl,
+        decodePrices)
+    if err != nil {
+        return nil, err
+    }
 
-	decompressor, err := gzip.NewReader(reader)
-	if err != nil {
-		return nil, err
-	}
-	defer decompressor.Close()
-
-	decoder := json.NewDecoder(decompressor)
-	var allSets map[string]MTGSet
-	if err := decoder.Decode(&allSets); err != nil {
-		return nil, err
-	}
-	return allSets, nil
+    if resultCast, ok := result.(map[string]MTGCardPrices); !ok {
+        return nil, fmt.Errorf("Unable to convert all prices result to correct type")
+    } else {
+        return resultCast, nil
+    }
 }
 
-func TryBz2(useCachedIfAvailable bool) (map[string]MTGSet, error) {
-	reader, err := TryDownload(allPrintingsBz2, useCachedIfAvailable)
-	if err != nil {
-		return nil, err
-	}
-	defer reader.Close()
-
-	decompressor := bzip2.NewReader(reader)
-
-	decoder := json.NewDecoder(decompressor)
-	var allSets map[string]MTGSet
-	if err := decoder.Decode(&allSets); err != nil {
-		return nil, err
-	}
-	return allSets, nil
+func decodeSets(input io.Reader) (interface{}, error) {
+    decoder := json.NewDecoder(input)
+    var result map[string]MTGSet
+    if err := decoder.Decode(&result); err != nil {
+        return nil, err
+    }
+    return result, nil
 }
 
-func TryRaw(useCachedIfAvailable bool) (map[string]MTGSet, error) {
-	reader, err := TryDownload(allPrintingsRawJson, useCachedIfAvailable)
-	if err != nil {
-		return nil, err
-	}
-	defer reader.Close()
-
-	decoder := json.NewDecoder(reader)
-	var allSets map[string]MTGSet
-	if err := decoder.Decode(&allSets); err != nil {
-		return nil, err
-	}
-	return allSets, nil
+func decodePrices(input io.Reader) (interface{}, error) {
+    decoder := json.NewDecoder(input)
+    var result map[string]MTGCardPrices
+    if err := decoder.Decode(&result); err != nil {
+        return nil, err
+    }
+    return result, nil
 }
 
-func TryDownload(filename string, useCachedIfAvailable bool) (io.ReadCloser, error) {
+func downloadData(
+        useCachedIfAvailable bool,
+        fileUrl string,
+        decoderFn func(io.Reader) (interface{}, error)) (interface{}, error) {
+    result, err := tryGz(useCachedIfAvailable, fileUrl, decoderFn)
+    if err == nil {
+        return result, nil
+    }
+    log.Print(err)
+
+    result, err = tryBz2(useCachedIfAvailable, fileUrl, decoderFn)
+    if err == nil {
+        return result, nil
+    }
+    log.Print(err)
+
+    result, err = tryRaw(useCachedIfAvailable, fileUrl, decoderFn)
+    if err == nil {
+        return result, nil
+    }
+    log.Print(err)
+
+    return nil, fmt.Errorf("Unable to get %s from any sources", fileUrl)
+}
+
+func tryGz(
+        useCachedIfAvailable bool,
+        fileUrl string,
+        decoderFn func(io.Reader) (interface{}, error)) (interface{}, error) {
+    reader, err := tryDownload(fileUrl + jsonExt + gzExt, useCachedIfAvailable)
+    if err != nil {
+        return nil, err
+    }
+    defer reader.Close()
+
+    decompressor, err := gzip.NewReader(reader)
+    if err != nil {
+        return nil, err
+    }
+    defer decompressor.Close()
+
+    return decoderFn(decompressor)
+}
+
+func tryBz2(
+        useCachedIfAvailable bool,
+        fileUrl string,
+        decoderFn func(io.Reader) (interface{}, error)) (interface{}, error) {
+    reader, err := tryDownload(fileUrl + jsonExt + bz2Ext, useCachedIfAvailable)
+    if err != nil {
+        return nil, err
+    }
+    defer reader.Close()
+
+    decompressor := bzip2.NewReader(reader)
+
+    return decoderFn(decompressor)
+}
+
+func tryRaw(
+        useCachedIfAvailable bool,
+        fileUrl string,
+        decoderFn func(io.Reader) (interface{}, error)) (interface{}, error) {
+    reader, err := tryDownload(fileUrl + jsonExt, useCachedIfAvailable)
+    if err != nil {
+        return nil, err
+    }
+    defer reader.Close()
+
+    return decoderFn(reader)
+}
+
+func tryDownload(filename string, useCachedIfAvailable bool) (io.ReadCloser, error) {
 	// If we've either been asked to not use a local cached file, or
 	// we have, but the file hasn't been downloaded, download the file
 	_, err := os.Stat(filename)
