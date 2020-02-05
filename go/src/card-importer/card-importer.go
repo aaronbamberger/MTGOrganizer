@@ -16,7 +16,7 @@ func main() {
 
     count := 0
     for uuid, prices := range allPrices {
-        log.Printf("UUID: %s, Prices: %v", uuid, prices)
+        log.Printf("UUID: %s, Prices: %s", uuid, prices)
         count += 1
         if count > 5 {
             break

@@ -1,15 +1,26 @@
 package mtgcards
 
 import "bytes"
-import "encoding/json"
-import "log"
+import "fmt"
+import "strconv"
 import "time"
 
+type MTGCardPricesTopLevelDummy struct {
+    Prices MTGCardPrices `json:"prices"`
+}
+
+type MTGCardPriceRecords []MTGCardPriceRecord
+
 type MTGCardPrices struct {
-    MTGO map[string]float32 `json:"mtgo"`
-    MTGOFoil map[string]float32 `json:"mtgoFoil"`
-    Paper map[string]float32 `json:"paper"`
-    PaperFoil map[string]float32 `json:"paperFoil"`
+    MTGO MTGCardPriceRecords `json:"mtgo"`
+    MTGOFoil MTGCardPriceRecords `json:"mtgoFoil"`
+    Paper MTGCardPriceRecords `json:"paper"`
+    PaperFoil MTGCardPriceRecords `json:"paperFoil"`
+}
+
+func (prices MTGCardPrices) String() string {
+    return fmt.Sprintf("{MTGO: %v, MTGOFoil: %v, Paper: %v, PaperFoil: %v}",
+        prices.MTGO, prices.MTGOFoil, prices.Paper, prices.PaperFoil)
 }
 
 type MTGCardPriceRecord struct {
@@ -17,29 +28,34 @@ type MTGCardPriceRecord struct {
     Price float64
 }
 
-type MTGCardPricesDummy struct {
-    MTGO map[string]float32 `json:"mtgo"`
-    MTGOFoil map[string]float32 `json:"mtgoFoil"`
-    Paper map[string]float32 `json:"paper"`
-    PaperFoil map[string]float32 `json:"paperFoil"`
-}
-
-func (prices *MTGCardPrices) UnmarshalJSON(data []byte) error {
-    // First, trim off the leading and trailing object delimiters
+func (priceRecords *MTGCardPriceRecords) UnmarshalJSON(data []byte) error {
+    // First, truncate the starting and ending object delimiters
     data = data[1:len(data)-1]
-    var pricesDummy MTGCardPricesDummy
-    keyAndValue := bytes.SplitN(data, []byte(":"), 2)
-    if bytes.Contains(keyAndValue[0], []byte("prices")) {
-        err := json.Unmarshal(keyAndValue[1], &pricesDummy)
-        if err != nil {
-            return err
+    if len(data) > 0 {
+        records := bytes.Split(data, []byte(","))
+        for _, record := range records {
+            dateAndPrice := bytes.Split(record, []byte(":"))
+
+            // For some reason, the input data set can sometimes have "null" for a price
+            // skip these entries
+            if bytes.Contains(dateAndPrice[1], []byte("null")) {
+                continue
+            }
+
+            // Trim whitespace and quotes from the date and price strings
+            dateString := string(bytes.Trim(dateAndPrice[0], "\" "))
+            priceString := string(bytes.Trim(dateAndPrice[1], "\" "))
+
+            date, err := time.Parse("2006-01-02", dateString)
+            if err != nil {
+                return err
+            }
+            price, err := strconv.ParseFloat(priceString, 64)
+            if err != nil {
+                return err
+            }
+            *priceRecords = append(*priceRecords, MTGCardPriceRecord{Date: date, Price: price})
         }
-        prices.MTGO = pricesDummy.MTGO
-        prices.MTGOFoil = pricesDummy.MTGOFoil
-        prices.Paper = pricesDummy.Paper
-        prices.PaperFoil = pricesDummy.PaperFoil
-    } else {
-        log.Print("Unexpected key and value %s", keyAndValue)
     }
 
     return nil

@@ -46,10 +46,16 @@ func DownloadAllPrices(useCachedIfAvailable bool) (map[string]MTGCardPrices, err
         return nil, err
     }
 
-    if resultCast, ok := result.(map[string]MTGCardPrices); !ok {
+    if resultCast, ok := result.(map[string]MTGCardPricesTopLevelDummy); !ok {
         return nil, fmt.Errorf("Unable to convert all prices result to correct type")
     } else {
-        return resultCast, nil
+        // Convert from the dummy struct used for JSON unpacking into the proper struct
+        resultConv := make(map[string]MTGCardPrices, len(resultCast))
+        for uuid, cardPricesDummy := range resultCast {
+            resultConv[uuid] = cardPricesDummy.Prices
+        }
+
+        return resultConv, nil
     }
 }
 
@@ -64,7 +70,7 @@ func decodeSets(input io.Reader) (interface{}, error) {
 
 func decodePrices(input io.Reader) (interface{}, error) {
     decoder := json.NewDecoder(input)
-    var result map[string]MTGCardPrices
+    var result map[string]MTGCardPricesTopLevelDummy
     if err := decoder.Decode(&result); err != nil {
         return nil, err
     }
