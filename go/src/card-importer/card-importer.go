@@ -4,7 +4,7 @@ package main
 import _ "github.com/go-sql-driver/mysql"
 import "log"
 import "mtgcards"
-//import "carddb"
+import "carddb"
 
 func main() {
     allPrices, err := mtgcards.DownloadAllPrices(true)
@@ -13,6 +13,11 @@ func main() {
     }
 
     log.Printf("Num prices: %d\n", len(allPrices))
+
+    err = carddb.ImportPricesToDb(allPrices)
+    if err != nil {
+        log.Fatal(err)
+    }
 
     count := 0
     for uuid, prices := range allPrices {

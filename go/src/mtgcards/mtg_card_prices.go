@@ -11,6 +11,18 @@ type MTGCardPricesTopLevelDummy struct {
 
 type MTGCardPriceRecords []MTGCardPriceRecord
 
+func (priceRecords MTGCardPriceRecords) Len() int {
+	return len(priceRecords)
+}
+
+func (priceRecords MTGCardPriceRecords) Less(i, j int) bool {
+	return priceRecords[i].Date.Before(priceRecords[j].Date)
+}
+
+func (priceRecords MTGCardPriceRecords) Swap(i, j int) {
+	priceRecords[i], priceRecords[j] = priceRecords[j], priceRecords[i]
+}
+
 type MTGCardPrices struct {
     MTGO MTGCardPriceRecords `json:"mtgo"`
     MTGOFoil MTGCardPriceRecords `json:"mtgoFoil"`
