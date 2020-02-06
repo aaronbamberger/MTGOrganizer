@@ -30,3 +30,17 @@ services:
             INFLUXDB_ADMIN_PASSWORD: admin_password
             INFLUXDB_USER: app_user
             INFLUXDB_USER_PASSWORD: app_db_password
+    grafana:
+        image: "grafana/grafana:latest"
+        volumes:
+            - /bagner_data/Projects/MTGOrganizer/db/grafana:/var/lib/grafana
+        ports:
+            - "3000:3000"
+        environment:
+            #GF_DATABASE_TYPE: mysql
+            #GF_DATABASE_HOST: card_db
+            #GF_DATABASE_NAME: grafana
+            #GF_DATABASE_USER: app_user
+            #GF_DATABASE_PASSWORD: add_db_password
+            GF_SECURITY_ADMIN_USER: grafana_admin
+            GF_SECURITY_ADMIN_PASSWORD: grafana_admin_password
