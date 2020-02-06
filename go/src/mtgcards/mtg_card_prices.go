@@ -1,13 +1,8 @@
 package mtgcards
 
-import "bytes"
 import "fmt"
-import "strconv"
+import "encoding/json"
 import "time"
-
-type MTGCardPricesTopLevelDummy struct {
-    Prices MTGCardPrices `json:"prices"`
-}
 
 type MTGCardPriceRecords []MTGCardPriceRecord
 
@@ -30,6 +25,8 @@ type MTGCardPrices struct {
     PaperFoil MTGCardPriceRecords `json:"paperFoil"`
 }
 
+type MTGCardPricesDummy MTGCardPrices
+
 func (prices MTGCardPrices) String() string {
     return fmt.Sprintf("{MTGO: %v, MTGOFoil: %v, Paper: %v, PaperFoil: %v}",
         prices.MTGO, prices.MTGOFoil, prices.Paper, prices.PaperFoil)
@@ -40,34 +37,48 @@ type MTGCardPriceRecord struct {
     Price float64
 }
 
+type mtgCardPricesTopLevelDummy struct {
+    Prices MTGCardPricesDummy `json:"prices"`
+}
+
+func (cardPrices *MTGCardPrices) UnmarshalJSON(data []byte) error {
+    // First, unmarshal into a dummy object to deal with the top-level
+    // "prices" key
+    var pricesDummy mtgCardPricesTopLevelDummy
+    err := json.Unmarshal(data, &pricesDummy)
+    if err != nil {
+        return err
+    }
+
+    // The top-level dummy object contains another dummy object for the actual
+    // prices which is just a type alias to the actual prices object.  This is just
+    // so that it's a different type, because else when we try to unmarshal into
+    // the top-level object, we'll end up recursively calling this custom
+    // unmarshal function, when what we actually want is the standard
+    // unmarshalling.  Since it's a different type, we need to cast here,
+    // but we know it's compatible since it's just a type alias
+    *cardPrices = MTGCardPrices(pricesDummy.Prices)
+
+    return nil
+}
+
 func (priceRecords *MTGCardPriceRecords) UnmarshalJSON(data []byte) error {
-    // First, truncate the starting and ending object delimiters
-    data = data[1:len(data)-1]
-    if len(data) > 0 {
-        records := bytes.Split(data, []byte(","))
-        for _, record := range records {
-            dateAndPrice := bytes.Split(record, []byte(":"))
+    // First, unpack the data into a map of date to price, since that's its
+    // native format
+    priceMap := make(map[string]float64)
+    err := json.Unmarshal(data, &priceMap)
+    if err != nil {
+        return err
+    }
 
-            // For some reason, the input data set can sometimes have "null" for a price
-            // skip these entries
-            if bytes.Contains(dateAndPrice[1], []byte("null")) {
-                continue
-            }
-
-            // Trim whitespace and quotes from the date and price strings
-            dateString := string(bytes.Trim(dateAndPrice[0], "\" "))
-            priceString := string(bytes.Trim(dateAndPrice[1], "\" "))
-
-            date, err := time.Parse("2006-01-02", dateString)
-            if err != nil {
-                return err
-            }
-            price, err := strconv.ParseFloat(priceString, 64)
-            if err != nil {
-                return err
-            }
-            *priceRecords = append(*priceRecords, MTGCardPriceRecord{Date: date, Price: price})
+    // Now, convert the map entries into price record objects
+    for dateString, price := range priceMap {
+        date, err := time.Parse("2006-01-02", dateString)
+        if err != nil {
+            return err
         }
+        newRecord := MTGCardPriceRecord{Date: date, Price: price}
+        *priceRecords = append(*priceRecords, newRecord)
     }
 
     return nil
