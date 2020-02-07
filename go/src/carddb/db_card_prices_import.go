@@ -1,80 +1,150 @@
 package carddb
 
 import influx "github.com/influxdata/influxdb1-client/v2"
+import "fmt"
 import "mtgcards"
+import "sort"
+import "time"
 
-func ImportPricesToDb(prices map[string]mtgcards.MTGCardPrices) error {
-    clientConfig := influx.HTTPConfig{
-        Addr: "http://172.18.0.3:8086",
-        Username: "app_user",
-        Password: "app_db_password"}
+type PricesImportStats struct {
+    CardRecordsAdded int
+    MTGOPriceRecordsAdded int
+    MTGOFoilPriceRecordsAdded int
+    PaperPriceRecordsAdded int
+    PaperFoilPriceRecordsAdded int
+}
 
-    client, err := influx.NewHTTPClient(clientConfig)
-    if err != nil {
-        return err
-    }
-    defer client.Close()
+func ImportPricesToDb(
+        influxClient influx.Client,
+        lastImportTime time.Time,
+        prices map[string]mtgcards.MTGCardPrices) (PricesImportStats, error) {
 
     // Create the points to be pushed to the db
     bpConfig := influx.BatchPointsConfig{Database: "mtg_cards"}
-    bp, err := influx.NewBatchPoints(bpConfig)
-    if err != nil {
-        return err
-    }
 
+    // Keep some stats
+    cardRecordsAdded := 0
+    mtgoPriceRecordsAdded := 0
+    mtgoFoilPriceRecordsAdded := 0
+    paperPriceRecordsAdded := 0
+    paperFoilPriceRecordsAdded := 0
+
+    totalRecords := len(prices)
+    currentRecord := 0
+
+    var bp influx.BatchPoints
+    var err error
     for card, cardPrices := range prices {
-        for _, priceRecord := range cardPrices.MTGO {
-            point, err := influx.NewPoint("mtgo",
-                map[string]string{"card": card}, 
-                map[string]interface{}{"price": priceRecord.Price},
-                priceRecord.Date)
+        fmt.Printf("Processing price record %d of %d\r", currentRecord, totalRecords)
+
+        // Batch up records 100 at a time
+        if currentRecord % 100 == 0 {
+            bp, err = influx.NewBatchPoints(bpConfig)
             if err != nil {
-                return err
+                return PricesImportStats{}, err
             }
-            bp.AddPoint(point)
         }
 
-        for _, priceRecord := range cardPrices.MTGOFoil {
-            point, err := influx.NewPoint(
-                "mtgo_foil",
-                map[string]string{"card": card},
-                map[string]interface{}{"price": priceRecord.Price},
-                priceRecord.Date)
+        // MTGO
+        newPriceRecords, err := maybeAddPoints(
+            bp,
+            card,
+            cardPrices.MTGO,
+            "mtgo",
+            lastImportTime)
+        if err != nil {
+            return PricesImportStats{}, err
+        }
+        mtgoPriceRecordsAdded += newPriceRecords
+
+        // MTGO Foil
+        newPriceRecords, err = maybeAddPoints(
+            bp,
+            card,
+            cardPrices.MTGOFoil,
+            "mtgo_foil",
+            lastImportTime)
+        if err != nil {
+            return PricesImportStats{}, err
+        }
+        mtgoFoilPriceRecordsAdded += newPriceRecords
+
+        // Paper
+        newPriceRecords, err = maybeAddPoints(
+            bp,
+            card,
+            cardPrices.Paper,
+            "paper",
+            lastImportTime)
+        if err != nil {
+            return PricesImportStats{}, err
+        }
+        paperPriceRecordsAdded += newPriceRecords
+
+        // Paper Foil
+        newPriceRecords, err = maybeAddPoints(
+            bp,
+            card,
+            cardPrices.PaperFoil,
+            "paper_foil",
+            lastImportTime)
+        if err != nil {
+            return PricesImportStats{}, err
+        }
+        paperFoilPriceRecordsAdded += newPriceRecords
+
+        cardRecordsAdded += 1
+
+        if currentRecord % 100 == 0 {
+            err = influxClient.Write(bp)
             if err != nil {
-                return err
+                return PricesImportStats{}, err
             }
-            bp.AddPoint(point)
         }
 
-        for _, priceRecord := range cardPrices.Paper {
-            point, err := influx.NewPoint(
-                "paper",
-                map[string]string{"card": card},
-                map[string]interface{}{"price": priceRecord.Price},
-                priceRecord.Date)
-            if err != nil {
-                return err
-            }
-            bp.AddPoint(point)
-        }
-
-        for _, priceRecord := range cardPrices.PaperFoil {
-            point, err := influx.NewPoint(
-                "paper_foil",
-                map[string]string{"card": card},
-                map[string]interface{}{"price": priceRecord.Price},
-                priceRecord.Date)
-            if err != nil {
-                return err
-            }
-            bp.AddPoint(point)
-        }
+        currentRecord += 1
     }
 
-    err = client.Write(bp)
-    if err != nil {
-        return err
+    fmt.Printf("\n")
+
+    importStats := PricesImportStats{
+        CardRecordsAdded: cardRecordsAdded,
+        MTGOPriceRecordsAdded: mtgoPriceRecordsAdded,
+        MTGOFoilPriceRecordsAdded: mtgoFoilPriceRecordsAdded,
+        PaperPriceRecordsAdded: paperPriceRecordsAdded,
+        PaperFoilPriceRecordsAdded: paperFoilPriceRecordsAdded}
+
+    return importStats, nil
+}
+
+func maybeAddPoints(
+        bp influx.BatchPoints,
+        card string,
+        priceRecords mtgcards.MTGCardPriceRecords,
+        measurementName string,
+        lastImportDate time.Time) (int, error) {
+    // First, sort the price records
+    sort.Sort(priceRecords)
+
+    pointsAdded := 0
+    for _, priceRecord := range priceRecords {
+        // Only import points that are after the last time we
+        // imported data
+        if priceRecord.Date.Before(lastImportDate) {
+            continue
+        }
+
+        point, err := influx.NewPoint(
+            measurementName,
+            map[string]string{"card": card},
+            map[string]interface{}{"price": priceRecord.Price},
+            priceRecord.Date)
+        if err != nil {
+            return 0, err
+        }
+        bp.AddPoint(point)
+        pointsAdded += 1
     }
 
-    return nil
+    return pointsAdded, nil
 }

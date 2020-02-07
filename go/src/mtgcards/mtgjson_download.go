@@ -13,6 +13,7 @@ const (
 	mtgjsonBaseUrl = "https://www.mtgjson.com/files/"
     allPrintingsUrl = "AllPrintings"
     allPricesUrl = "AllPrices"
+    versionUrl = "version"
 )
 
 const (
@@ -53,6 +54,22 @@ func DownloadAllPrices(useCachedIfAvailable bool) (map[string]MTGCardPrices, err
     }
 }
 
+func DownloadVersion() (MTGJSONVersion, error) {
+    result, err := downloadData(
+        false,
+        versionUrl,
+        decodeVersion)
+    if err != nil {
+        return MTGJSONVersion{}, err
+    }
+
+    if resultCast, ok := result.(MTGJSONVersion); !ok {
+        return MTGJSONVersion{}, fmt.Errorf("Unable to convert version to correct type")
+    } else {
+        return resultCast, nil
+    }
+}
+
 func decodeSets(input io.Reader) (interface{}, error) {
     decoder := json.NewDecoder(input)
     var result map[string]MTGSet
@@ -65,6 +82,15 @@ func decodeSets(input io.Reader) (interface{}, error) {
 func decodePrices(input io.Reader) (interface{}, error) {
     decoder := json.NewDecoder(input)
     var result map[string]MTGCardPrices
+    if err := decoder.Decode(&result); err != nil {
+        return nil, err
+    }
+    return result, nil
+}
+
+func decodeVersion(input io.Reader) (interface{}, error) {
+    decoder := json.NewDecoder(input)
+    var result MTGJSONVersion
     if err := decoder.Decode(&result); err != nil {
         return nil, err
     }

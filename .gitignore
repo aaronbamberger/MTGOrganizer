@@ -4,5 +4,6 @@ go/src/card-importer/card-importer
 go/src/card-stats/card-stats
 AllPrintings.*
 AllPrices.*
+version.*
 go/pkg/
 go/src/github.com/
