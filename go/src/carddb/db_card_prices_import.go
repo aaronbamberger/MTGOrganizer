@@ -14,13 +14,20 @@ type PricesImportStats struct {
     PaperFoilPriceRecordsAdded int
 }
 
+const POINTS_PER_WRITE = 1000
+
 func ImportPricesToDb(
         influxClient influx.Client,
         lastImportTime time.Time,
         prices map[string]mtgcards.MTGCardPrices) (PricesImportStats, error) {
+    importStats := PricesImportStats{}
 
     // Create the points to be pushed to the db
     bpConfig := influx.BatchPointsConfig{Database: "mtg_cards"}
+    bp, err := influx.NewBatchPoints(bpConfig)
+    if err != nil {
+        return importStats, err
+    }
 
     // Keep some stats
     cardRecordsAdded := 0
@@ -31,17 +38,24 @@ func ImportPricesToDb(
 
     totalRecords := len(prices)
     currentRecord := 0
+    totalPointsImported := 0
 
-    var bp influx.BatchPoints
-    var err error
     for card, cardPrices := range prices {
         fmt.Printf("Processing price record %d of %d\r", currentRecord, totalRecords)
 
-        // Batch up records 100 at a time
-        if currentRecord % 100 == 0 {
+        // Batch up records to write to influx so that we don't overflow a single
+        // request, but also don't take too long
+        if len(bp.Points()) > POINTS_PER_WRITE {
+            err = influxClient.Write(bp)
+            if err != nil {
+                return importStats, err
+            }
+
+            totalPointsImported += len(bp.Points())
+
             bp, err = influx.NewBatchPoints(bpConfig)
             if err != nil {
-                return PricesImportStats{}, err
+                return importStats, err
             }
         }
 
@@ -53,7 +67,7 @@ func ImportPricesToDb(
             "mtgo",
             lastImportTime)
         if err != nil {
-            return PricesImportStats{}, err
+            return importStats, err
         }
         mtgoPriceRecordsAdded += newPriceRecords
 
@@ -65,7 +79,7 @@ func ImportPricesToDb(
             "mtgo_foil",
             lastImportTime)
         if err != nil {
-            return PricesImportStats{}, err
+            return importStats, err
         }
         mtgoFoilPriceRecordsAdded += newPriceRecords
 
@@ -77,7 +91,7 @@ func ImportPricesToDb(
             "paper",
             lastImportTime)
         if err != nil {
-            return PricesImportStats{}, err
+            return importStats, err
         }
         paperPriceRecordsAdded += newPriceRecords
 
@@ -89,30 +103,38 @@ func ImportPricesToDb(
             "paper_foil",
             lastImportTime)
         if err != nil {
-            return PricesImportStats{}, err
+            return importStats, err
         }
         paperFoilPriceRecordsAdded += newPriceRecords
 
-        cardRecordsAdded += 1
-
-        if currentRecord % 100 == 0 {
-            err = influxClient.Write(bp)
-            if err != nil {
-                return PricesImportStats{}, err
-            }
+        if mtgoPriceRecordsAdded > 0 ||
+                mtgoFoilPriceRecordsAdded > 0 ||
+                paperPriceRecordsAdded > 0 ||
+                paperFoilPriceRecordsAdded > 0 {
+            cardRecordsAdded += 1
         }
 
         currentRecord += 1
     }
 
-    fmt.Printf("\n")
+    // Flush any remaining points to the db
+    if len(bp.Points()) > 0 {
+        err = influxClient.Write(bp)
+        if err != nil {
+            return importStats, err
+        }
 
-    importStats := PricesImportStats{
-        CardRecordsAdded: cardRecordsAdded,
-        MTGOPriceRecordsAdded: mtgoPriceRecordsAdded,
-        MTGOFoilPriceRecordsAdded: mtgoFoilPriceRecordsAdded,
-        PaperPriceRecordsAdded: paperPriceRecordsAdded,
-        PaperFoilPriceRecordsAdded: paperFoilPriceRecordsAdded}
+        totalPointsImported += len(bp.Points())
+    }
+
+    fmt.Printf("\n")
+    fmt.Printf("Total points imported: %d\n", totalPointsImported)
+
+    importStats.CardRecordsAdded = cardRecordsAdded
+    importStats.MTGOPriceRecordsAdded = mtgoPriceRecordsAdded
+    importStats.MTGOFoilPriceRecordsAdded = mtgoFoilPriceRecordsAdded
+    importStats.PaperPriceRecordsAdded = paperPriceRecordsAdded
+    importStats.PaperFoilPriceRecordsAdded = paperFoilPriceRecordsAdded
 
     return importStats, nil
 }

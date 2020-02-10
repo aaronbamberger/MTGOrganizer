@@ -2,6 +2,7 @@ db/
 *.swp
 go/src/card-importer/card-importer
 go/src/card-stats/card-stats
+go/src/debug-playground/debug-playground
 AllPrintings.*
 AllPrices.*
 version.*
