@@ -8,9 +8,9 @@ import "sync"
 
 func ImportSetsToDB(
         db *sql.DB,
-        sets map[string]mtgcards.MTGSet) (*DBUpdateStats, error) {
+        sets map[string]mtgcards.MTGSet) (*CardUpdateStats, error) {
 	var setImportWg sync.WaitGroup
-	var stats DBUpdateStats
+	var stats CardUpdateStats
 
 	// We defer the cleanup before calling the setup function, because the setup
 	// function might get partway through the initialization, and then error out,
@@ -72,7 +72,7 @@ func maybeInsertSetToDb(
         insertQueries *DBInsertQueries,
         updateQueries *DBUpdateQueries,
         deleteQueries *DBDeleteQueries,
-        stats *DBUpdateStats,
+        stats *CardUpdateStats,
 		wg *sync.WaitGroup,
         set mtgcards.MTGSet) {
 	defer wg.Done()

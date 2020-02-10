@@ -6,6 +6,7 @@ import influx "github.com/influxdata/influxdb1-client/v2"
 import "log"
 import "mtgcards"
 import "carddb"
+import "time"
 
 func main() {
 	// Connect to the mariadb database
@@ -42,7 +43,11 @@ func main() {
     log.Printf("Online version:\n%s", onlineVersion)
     log.Printf("DB version:\n%s", dbVersion)
 
+    cardsUpdated := false
+    pricesUpdated := false
+
     // Update cards if necessary
+    cardUpdateStart := time.Now()
     if onlineVersion.BuildDate.After(dbVersion.BuildDate) {
         log.Printf("Cards are out of date, updating...\n")
 
@@ -86,11 +91,20 @@ func main() {
             stats.ExistingTokensSkipped())
         log.Printf("Existing tokens updated due to hash mismatch: %d\n",
             stats.ExistingTokensUpdated())
+
+        cardsUpdated = true
+        log.Printf("Adding card update stats to the db...\n")
+        err = stats.AddToDb(influxClient)
+        if err != nil {
+            log.Print(err)
+        }
     } else {
         log.Printf("Already have latest version of cards, skipping update...\n")
     }
+    cardUpdateDuration := time.Now().Sub(cardUpdateStart)
 
     // Update prices if necessary
+    priceUpdateStart := time.Now()
     if onlineVersion.PricesDate.After(dbVersion.PricesDate) {
         log.Printf("Prices are out of date, updating...\n")
 
@@ -105,14 +119,23 @@ func main() {
         if err != nil {
             log.Fatal(err)
         }
-        log.Printf("New price records added for %d cards\n", stats.CardRecordsAdded)
-        log.Printf("New MTGO price records added: %d\n", stats.MTGOPriceRecordsAdded)
-        log.Printf("New MTGO foil price records added: %d\n", stats.MTGOFoilPriceRecordsAdded)
-        log.Printf("New paper price records added: %d\n", stats.PaperPriceRecordsAdded)
-        log.Printf("New paper foil price records added: %d\n", stats.PaperFoilPriceRecordsAdded)
+        log.Printf("New price records added for %d cards\n", stats.TotalCardRecords())
+        log.Printf("Total new price records added: %d\n", stats.TotalPriceRecords())
+        log.Printf("New MTGO price records added: %d\n", stats.MTGOPriceRecords())
+        log.Printf("New MTGO foil price records added: %d\n", stats.MTGOFoilPriceRecords())
+        log.Printf("New paper price records added: %d\n", stats.PaperPriceRecords())
+        log.Printf("New paper foil price records added: %d\n", stats.PaperFoilPriceRecords())
+
+        pricesUpdated = true
+        log.Printf("Adding price update stats to the db...\n")
+        err = stats.AddToDb(influxClient)
+        if err != nil {
+            log.Print(err)
+        }
     } else {
         log.Printf("Already have latest version of prices, skipping update...\n")
     }
+    priceUpdateDuration := time.Now().Sub(priceUpdateStart)
 
     // Update the update times in the db
     log.Printf("Updating last update time in DB\n")
@@ -120,4 +143,12 @@ func main() {
     if err != nil {
         log.Fatal(err)
     }
+
+    // Add the update run stats to the db
+    log.Printf("Adding update run stats to db...\n")
+    carddb.AddSingleUpdateStatsToDb(influxClient,
+        cardsUpdated,
+        pricesUpdated,
+        cardUpdateDuration,
+        priceUpdateDuration)
 }
