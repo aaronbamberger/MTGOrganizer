@@ -3,6 +3,7 @@ package mtgcards
 import "encoding/binary"
 import "fmt"
 import "hash/fnv"
+import "reflect"
 import "sort"
 import "strings"
 
@@ -48,6 +49,51 @@ type MTGCardCommon struct {
 
     commonHash string
     commonHashValid bool
+}
+
+func (card *MTGCardCommon) Diff(other *MTGCardCommon) string {
+    var b strings.Builder
+
+    cardType := reflect.TypeOf(*card)
+
+    selfValue := reflect.ValueOf(*card)
+    otherValue := reflect.ValueOf(*other)
+
+    for i := 0; i < cardType.NumField(); i++ {
+        cardField := cardType.Field(i)
+        selfField := selfValue.FieldByName(cardField.Name)
+        otherField := otherValue.FieldByName(cardField.Name)
+        switch selfField.Kind() {
+        case reflect.Bool:
+            if selfField.Bool() != otherField.Bool() {
+                fmt.Fprintf(&b, "%s (%t | %t)\n", cardField.Name,
+                    selfField.Bool(), otherField.Bool())
+            }
+        case reflect.Int:
+            if selfField.Int() != otherField.Int() {
+                fmt.Fprintf(&b, "%s (%d | %d)\n", cardField.Name,
+                    selfField.Int(), otherField.Int())
+            }
+        case reflect.String:
+            if selfField.String() != otherField.String() {
+                fmt.Fprintf(&b, "%s (%s | %s)\n", cardField.Name,
+                    selfField.String(), otherField.String())
+            }
+
+        case reflect.Slice:
+            if selfField.Len() != otherField.Len() {
+                fmt.Fprintf(&b, "%s length (%d | %d)\n", cardField.Name,
+                    selfField.Len(), otherField.Len())
+            }
+            // TODO: Diff values
+
+        case reflect.Map:
+            // TODO: Diff maps
+
+        }
+    }
+
+    return b.String()
 }
 
 func (card *MTGCardCommon) Canonicalize() {
@@ -179,6 +225,53 @@ type MTGCard struct {
 
 	hash string
 	hashValid bool
+}
+
+func (card *MTGCard) Diff(other *MTGCard) string {
+    var b strings.Builder
+
+    b.WriteString(card.MTGCardCommon.Diff(&other.MTGCardCommon))
+
+    cardType := reflect.TypeOf(*card)
+
+    selfValue := reflect.ValueOf(*card)
+    otherValue := reflect.ValueOf(*other)
+
+    for i := 0; i < cardType.NumField(); i++ {
+        cardField := cardType.Field(i)
+        selfField := selfValue.FieldByName(cardField.Name)
+        otherField := otherValue.FieldByName(cardField.Name)
+        switch selfField.Kind() {
+        case reflect.Bool:
+            if selfField.Bool() != otherField.Bool() {
+                fmt.Fprintf(&b, "%s (%t | %t)\n", cardField.Name,
+                    selfField.Bool(), otherField.Bool())
+            }
+        case reflect.Int:
+            if selfField.Int() != otherField.Int() {
+                fmt.Fprintf(&b, "%s (%d | %d)\n", cardField.Name,
+                    selfField.Int(), otherField.Int())
+            }
+        case reflect.String:
+            if selfField.String() != otherField.String() {
+                fmt.Fprintf(&b, "%s (%s | %s)\n", cardField.Name,
+                    selfField.String(), otherField.String())
+            }
+
+        case reflect.Slice:
+            if selfField.Len() != otherField.Len() {
+                fmt.Fprintf(&b, "%s length (%d | %d)\n", cardField.Name,
+                    selfField.Len(), otherField.Len())
+            }
+            // TODO: Diff values
+
+        case reflect.Map:
+            // TODO: Diff maps
+
+        }
+    }
+
+    return b.String()
 }
 
 func (card *MTGCard) Hash() string {

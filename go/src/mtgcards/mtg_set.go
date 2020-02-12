@@ -2,9 +2,12 @@ package mtgcards
 
 import "encoding/binary"
 import "encoding/hex"
+import "fmt"
 import "hash"
 import "hash/fnv"
+import "reflect"
 import "sort"
+import "strings"
 
 func hashToHexString(hashVal hash.Hash) string {
     hashBytes := make([]byte, 0, hashVal.Size())
@@ -36,6 +39,51 @@ type MTGSet struct {
 
 	hash string
 	hashValid bool
+}
+
+func (set *MTGSet) Diff(other *MTGSet) string {
+    var b strings.Builder
+
+    setType := reflect.TypeOf(*set)
+
+    selfValue := reflect.ValueOf(*set)
+    otherValue := reflect.ValueOf(*set)
+
+    for i := 0; i < setType.NumField(); i++ {
+        setField := setType.Field(i)
+        selfField := selfValue.FieldByName(setField.Name)
+        otherField := otherValue.FieldByName(setField.Name)
+        switch selfField.Kind() {
+        case reflect.Bool:
+            if selfField.Bool() != otherField.Bool() {
+                fmt.Fprintf(&b, "%s (%t | %t)\n", setField.Name,
+                    selfField.Bool(), otherField.Bool())
+            }
+        case reflect.Int:
+            if selfField.Int() != otherField.Int() {
+                fmt.Fprintf(&b, "%s (%d | %d)\n", setField.Name,
+                    selfField.Int(), otherField.Int())
+            }
+        case reflect.String:
+            if selfField.String() != otherField.String() {
+                fmt.Fprintf(&b, "%s (%s | %s)\n", setField.Name,
+                    selfField.String(), otherField.String())
+            }
+
+        case reflect.Slice:
+            if selfField.Len() != otherField.Len() {
+                fmt.Fprintf(&b, "%s length (%d | %d)\n", setField.Name,
+                    selfField.Len(), otherField.Len())
+            }
+            // TODO: Diff values
+
+        case reflect.Map:
+            // TODO: Diff maps
+
+        }
+    }
+
+    return b.String()
 }
 
 func (set *MTGSet) Hash() string {

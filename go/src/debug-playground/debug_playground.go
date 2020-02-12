@@ -3,120 +3,99 @@ package main
 import "fmt"
 import "log"
 import "mtgcards"
-import "strings"
-
-const (
-    NONE = 0x00
-    MTGO = 0x01
-    MTGO_FOIL = 0x02
-    PAPER = 0x04
-    PAPER_FOIL = 0x08
-)
-
-type PriceTypes uint
-
-func (priceType PriceTypes) String() string {
-    var b strings.Builder
-
-    if priceType == NONE {
-        return "None"
-    }
-
-    if priceType & MTGO == MTGO {
-        b.WriteString("MTGO")
-    }
-
-    if priceType & MTGO_FOIL == MTGO_FOIL {
-        if b.Len() > 0 {
-            b.WriteString(",")
-        }
-        b.WriteString("MTGO_FOIL")
-    }
-
-    if priceType & PAPER == PAPER {
-        if b.Len() > 0 {
-            b.WriteString(",")
-        }
-        b.WriteString("PAPER")
-    }
-
-    if priceType & PAPER_FOIL == PAPER_FOIL {
-        if b.Len() > 0 {
-            b.WriteString(",")
-        }
-        b.WriteString("PAPER_FOIL")
-    }
-
-    return b.String()
-}
 
 func main() {
-    allPrices, err := mtgcards.DownloadAllPrices(true)
+    oldSets, err := mtgcards.DebugParseAllPrintingsGz("AllPrintings.json.gz.old")
     if err != nil {
         log.Fatal(err)
     }
 
-    numCardsWithPrices := 0
-    mtgoPrices := 0
-    mtgoFoilPrices := 0
-    paperPrices := 0
-    paperFoilPrices := 0
-    totalPrices := 0
-
-    cardsWithSpecificPriceTypes := make(map[PriceTypes]int)
-    cardsWithSpecificPriceTypes[NONE] = 0
-    cardsWithSpecificPriceTypes[MTGO] = 0
-    cardsWithSpecificPriceTypes[MTGO_FOIL] = 0
-    cardsWithSpecificPriceTypes[PAPER] = 0
-    cardsWithSpecificPriceTypes[PAPER_FOIL] = 0
-
-    for _, prices := range allPrices {
-        priceType := PriceTypes(NONE)
-        newPriceRecords := false
-
-        if len(prices.MTGO) > 0 {
-            mtgoPrices += len(prices.MTGO)
-            totalPrices += len(prices.MTGO)
-            newPriceRecords = true
-            priceType |= MTGO
-        }
-
-        if len(prices.MTGOFoil) > 0 {
-            mtgoFoilPrices += len(prices.MTGOFoil)
-            totalPrices += len(prices.MTGOFoil)
-            newPriceRecords = true
-            priceType |= MTGO_FOIL
-        }
-
-        if len(prices.Paper) > 0 {
-            paperPrices += len(prices.Paper)
-            totalPrices += len(prices.Paper)
-            newPriceRecords = true
-            priceType |= PAPER
-        }
-
-        if len(prices.PaperFoil) > 0 {
-            paperFoilPrices += len(prices.PaperFoil)
-            totalPrices += len(prices.PaperFoil)
-            newPriceRecords = true
-            priceType |= PAPER_FOIL
-        }
-
-        if newPriceRecords {
-            numCardsWithPrices += 1
-        }
-
-        cardsWithSpecificPriceTypes[priceType] += 1
+    newSets, err := mtgcards.DebugParseAllPrintingsGz("AllPrintings.json.gz")
+    if err != nil {
+        log.Fatal(err)
     }
 
-    fmt.Printf("Total cards with price records: %d\n", numCardsWithPrices)
-    fmt.Printf("Total price records: %d\n", totalPrices)
-    fmt.Printf("MTGO price records: %d\n", mtgoPrices)
-    fmt.Printf("MTGO foil price records: %d\n", mtgoFoilPrices)
-    fmt.Printf("Paper price records: %d\n", paperPrices)
-    fmt.Printf("Paper foil price records: %d\n", paperFoilPrices)
-    for priceType, count := range cardsWithSpecificPriceTypes {
-        fmt.Printf("Price type %s count: %d\n", priceType, count)
+    fmt.Printf("Old sets: %d, new sets: %d\n", len(oldSets), len(newSets))
+
+    expectedUpdatedSets := 0
+    expectedNewCards := 0
+    expectedUpdatedCards := 0
+    expectedNewTokens := 0
+    expectedUpdatedTokens := 0
+    for setCode, _ := range oldSets {
+        oldSet := oldSets[setCode]
+        oldSet.Canonicalize()
+        newSet := newSets[setCode]
+        newSet.Canonicalize()
+
+        if oldSet.Hash() != newSet.Hash() {
+            expectedUpdatedSets += 1
+            fmt.Printf("Hash mismatch for set %s (%s %s)\n", setCode, oldSet.Hash(), newSet.Hash())
+            fmt.Print(oldSet.Diff(&newSet))
+
+            expectedNewCards += len(newSet.Cards) - len(oldSet.Cards)
+            expectedNewTokens += len(newSet.Tokens) - len(oldSet.Tokens)
+
+            mismatchedCards := 0
+            mismatchedTokens := 0
+            uuidToOldCard := make(map[string]*mtgcards.MTGCard)
+            uuidToNewCard := make(map[string]*mtgcards.MTGCard)
+            uuidToOldToken := make(map[string]*mtgcards.MTGToken)
+            uuidToNewToken := make(map[string]*mtgcards.MTGToken)
+
+            for idx, _  := range oldSet.Cards {
+                card := &oldSet.Cards[idx]
+                uuidToOldCard[card.UUID] = card
+            }
+            for idx, _  := range newSet.Cards {
+                card := &newSet.Cards[idx]
+                uuidToNewCard[card.UUID] = card
+            }
+            for idx, _  := range oldSet.Tokens {
+                token := &oldSet.Tokens[idx]
+                uuidToOldToken[token.UUID] = token
+            }
+            for idx, _  := range newSet.Tokens {
+                token := &newSet.Tokens[idx]
+                uuidToNewToken[token.UUID] = token
+            }
+
+            for uuid, _ := range uuidToOldCard {
+                oldCard := uuidToOldCard[uuid]
+                newCard := uuidToNewCard[uuid]
+
+                if oldCard.Hash() != newCard.Hash() {
+                    expectedUpdatedCards += 1
+                    fmt.Printf("Hash mismatch for card %s (%s)\n",
+                        uuid, oldCard.Name)
+                    fmt.Print(oldCard.Diff(newCard))
+                    mismatchedCards += 1
+                }
+            }
+
+            for uuid, _ := range uuidToOldToken {
+                oldToken := uuidToOldToken[uuid]
+                newToken := uuidToNewToken[uuid]
+
+                if oldToken.Hash() != newToken.Hash() {
+                    expectedUpdatedTokens += 1
+                    fmt.Printf("Hash mismatch for token %s (%s)\n",
+                        uuid, oldToken.Name)
+                    mismatchedTokens += 1
+                }
+            }
+
+            fmt.Printf("Total old cards: %d, total new cards: %d, mismatched cards: %d\n",
+                len(uuidToOldCard), len(uuidToNewCard), mismatchedCards)
+            fmt.Printf("Total old tokens: %d, total new tokens: %d, mismatched tokens: %d\n",
+                len(uuidToOldToken), len(uuidToNewToken), mismatchedTokens)
+        }
     }
+
+    fmt.Printf("Expected updated sets: %d\n", expectedUpdatedSets)
+    fmt.Printf("Expected new cards: %d\n", expectedNewCards)
+    fmt.Printf("Expected new tokens: %d\n", expectedNewTokens)
+    fmt.Printf("Expected updated cards: %d\n", expectedUpdatedCards)
+    fmt.Printf("Expected updated tokens: %d\n", expectedUpdatedTokens)
 }
 

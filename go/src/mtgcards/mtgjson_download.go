@@ -38,6 +38,30 @@ func DownloadAllPrintings(useCachedIfAvailable bool) (map[string]MTGSet, error) 
     }
 }
 
+func DebugParseAllPrintingsGz(filename string) (map[string]MTGSet, error) {
+    file, err := os.Open(filename)
+	if err != nil {
+		return nil, err
+	}
+
+    decompressor, err := gzip.NewReader(file)
+    if err != nil {
+        return nil, err
+    }
+    defer decompressor.Close()
+
+    result, err := decodeSets(decompressor)
+    if err != nil {
+        return nil, err
+    }
+
+    if resultCast, ok := result.(map[string]MTGSet); !ok {
+        return nil, fmt.Errorf("Unable to conver all printings result to correct type")
+    } else {
+        return resultCast, nil
+    }
+}
+
 func DownloadAllPrices(useCachedIfAvailable bool) (map[string]MTGCardPrices, error) {
     result, err := downloadData(
         useCachedIfAvailable,
@@ -205,3 +229,5 @@ func tryDownload(filename string, useCachedIfAvailable bool) (io.ReadCloser, err
 	}
 	return file, err
 }
+
+
