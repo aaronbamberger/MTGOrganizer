@@ -55,7 +55,7 @@ func main() {
 func CheckForAndMaybeRunUpdate() {
 	// Connect to the mariadb database
 	cardDB, err := sql.Open("mysql",
-        "app_user:app_db_password@tcp(172.18.0.2)/mtg_cards?parseTime=true")
+        "app_user:app_db_password@tcp(card_db)/mtg_cards?parseTime=true")
 	if err != nil {
 		log.Print(err)
         return
@@ -65,7 +65,7 @@ func CheckForAndMaybeRunUpdate() {
 
     // Connect to the influxdb database
     influxClientConfig := influx.HTTPConfig{
-        Addr: "http://172.18.0.4:8086",
+        Addr: "http://card_prices_db:8086",
         Username: "app_user",
         Password: "app_db_password"}
 

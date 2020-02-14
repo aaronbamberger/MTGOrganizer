@@ -22,6 +22,10 @@ const (
     gzExt = ".gz"
 )
 
+const (
+    downloadLocation = "/var/card-importer/"
+)
+
 func DownloadAllPrintings(useCachedIfAvailable bool) (map[string]MTGSet, error) {
     result, err := downloadData(
         useCachedIfAvailable,
@@ -196,7 +200,8 @@ func tryRaw(
 func tryDownload(filename string, useCachedIfAvailable bool) (io.ReadCloser, error) {
 	// If we've either been asked to not use a local cached file, or
 	// we have, but the file hasn't been downloaded, download the file
-	_, err := os.Stat(filename)
+    fileLocation := downloadLocation + filename
+	_, err := os.Stat(fileLocation)
 	if !useCachedIfAvailable || os.IsNotExist(err) {
 		fullUrl := mtgjsonBaseUrl + filename
 		resp, err := http.Get(fullUrl)
@@ -209,7 +214,7 @@ func tryDownload(filename string, useCachedIfAvailable bool) (io.ReadCloser, err
 			return nil, fmt.Errorf("Error %s while fetching %s", resp.Status, fullUrl)
 		}
 
-		file, err := os.Create(filename)
+		file, err := os.Create(fileLocation)
 		if err != nil {
 			return nil, err
 		}
@@ -223,7 +228,7 @@ func tryDownload(filename string, useCachedIfAvailable bool) (io.ReadCloser, err
 
 	// If we're here, we've either freshly downloaded the file, or have determined
 	// there's an existing cached version we can use
-	file, err := os.Open(filename)
+	file, err := os.Open(fileLocation)
 	if err != nil {
 		return nil, err
 	}

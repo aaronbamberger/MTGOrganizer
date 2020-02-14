@@ -44,3 +44,9 @@ services:
             #GF_DATABASE_PASSWORD: add_db_password
             GF_SECURITY_ADMIN_USER: grafana_admin
             GF_SECURITY_ADMIN_PASSWORD: grafana_admin_password
+    card_importer:
+        build:
+            context: ../../go/
+            dockerfile: ../docker/card-importer/Dockerfile
+        volumes:
+            - ../../container-volumes/card-importer:/var/card-importer
