@@ -4,7 +4,7 @@ services:
         image: "mariadb:latest"
         command: --max-connections 1000 --innodb-lock-wait-timeout 300 --max-prepared-stmt-count 50000
         volumes:
-            - /bagner_data/Projects/MTGOrganizer/db/mariadb:/var/lib/mysql
+            - ../../container-volumes/mariadb:/var/lib/mysql
         environment:
             MYSQL_ROOT_PASSWORD: db_password
             MYSQL_DATABASE: mtg_cards
@@ -21,7 +21,7 @@ services:
     card_prices_db:
         image: "influxdb:latest"
         volumes:
-            - /bagner_data/Projects/MTGOrganizer/db/influxdb:/var/lib/influxdb
+            - ../../container-volumes/influxdb:/var/lib/influxdb
         ports:
             - "8086:8086"
         environment:
@@ -33,7 +33,7 @@ services:
     grafana:
         image: "grafana/grafana:latest"
         volumes:
-            - /bagner_data/Projects/MTGOrganizer/db/grafana:/var/lib/grafana
+            - ../../container-volumes/grafana:/var/lib/grafana
         ports:
             - "3000:3000"
         environment:

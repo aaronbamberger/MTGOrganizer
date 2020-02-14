@@ -1,4 +1,4 @@
-db/
+container-volumes/
 *.swp
 go/src/card-importer/card-importer
 go/src/card-stats/card-stats
