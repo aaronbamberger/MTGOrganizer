@@ -2,6 +2,7 @@ container-volumes/
 web_content/card_face_images/*.png
 *.swp
 go/src/card-importer/card-importer
+go/src/card-image-downloader/card-image-downloader
 go/src/card-stats/card-stats
 go/src/debug-playground/debug-playground
 AllPrintings.*
