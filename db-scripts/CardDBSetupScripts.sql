@@ -59,6 +59,7 @@ CREATE TABLE mtg_cards.all_cards (
 	text VARCHAR(1500) NOT NULL COLLATE utf8mb4_general_ci, #Max existing len: 770
 	toughness VARCHAR(10) NOT NULL COLLATE utf8mb4_general_ci, #Max existing len: 3
 	watermark VARCHAR(50) NOT NULL COLLATE utf8mb4_general_ci, #Max existing len: 21
+	image_cached_locally BOOLEAN NOT NULL DEFAULT FALSE,
 	UNIQUE INDEX uuid_index (uuid),
 	INDEX card_hash_index (card_hash),
 	INDEX name_index (name)
@@ -88,6 +89,7 @@ CREATE TABLE mtg_cards.all_tokens (
 	text VARCHAR(1500) NOT NULL COLLATE utf8mb4_general_ci, #Max existing len: 770
 	toughness VARCHAR(10) NOT NULL COLLATE utf8mb4_general_ci, #Max existing len: 3
 	watermark VARCHAR(50) NOT NULL COLLATE utf8mb4_general_ci, #Max existing len: 21
+	image_cached_locally BOOLEAN NOT NULL DEFAULT FALSE,
 	UNIQUE INDEX uuid_index (uuid),
 	INDEX token_hash_index (token_hash),
 	INDEX name_index (name)

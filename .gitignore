@@ -1,4 +1,5 @@
 container-volumes/
+web_content/card_face_images/*.png
 *.swp
 go/src/card-importer/card-importer
 go/src/card-stats/card-stats
