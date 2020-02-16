@@ -406,11 +406,80 @@ func (stats *CardUpdateStats) ExistingTokensUpdated() int {
     return stats.existingTokensUpdated
 }
 
+type ImageUpdateStats struct {
+    cardsNeedingImages int
+    tokensNeedingImages int
+    imagesDownloaded int
+    imagesFailedToDownload int
+}
+
+func (stats *ImageUpdateStats) AddToDb(client influx.Client) error {
+    bpConfig := influx.BatchPointsConfig{Database: "mtg_cards"}
+    bp, err := influx.NewBatchPoints(bpConfig)
+    if err != nil {
+        return err
+    }
+
+    fields := map[string]interface{} {
+        "cards_needing_images": stats.cardsNeedingImages,
+        "tokens_needing_images": stats.tokensNeedingImages,
+        "images_downloaded": stats.imagesDownloaded,
+        "images_failed_to_download": stats.imagesFailedToDownload}
+
+    point, err := influx.NewPoint("image_updates",
+        nil,
+        fields,
+        time.Now())
+
+    bp.AddPoint(point)
+
+    err = client.Write(bp)
+    if err != nil {
+        return err
+    }
+
+    return nil
+}
+
+func (stats *ImageUpdateStats) AddToCardsNeedingImages(delta int) {
+    stats.cardsNeedingImages += delta
+}
+
+func (stats *ImageUpdateStats) AddToTokensNeedingImages(delta int) {
+    stats.tokensNeedingImages += delta
+}
+
+func (stats *ImageUpdateStats) AddToImagesDownloaded(delta int) {
+    stats.imagesDownloaded += delta
+}
+
+func (stats *ImageUpdateStats) AddToImagesFailedToDownload(delta int) {
+    stats.imagesFailedToDownload += delta
+}
+
+func (stats *ImageUpdateStats) CardsNeedingImages() int {
+    return stats.cardsNeedingImages
+}
+
+func (stats *ImageUpdateStats) TokensNeedingImages() int {
+    return stats.tokensNeedingImages
+}
+
+func (stats *ImageUpdateStats) ImagesDownloaded() int {
+    return stats.imagesDownloaded
+}
+
+func (stats *ImageUpdateStats) ImagesFailedToDownload() int {
+    return stats.imagesFailedToDownload
+}
+
 func AddSingleUpdateStatsToDb(client influx.Client,
         cardsUpdated bool,
         pricesUpdated bool,
+        imagesUpdated bool,
         cardUpdateDuration time.Duration,
-        priceUpdateDuration time.Duration) error {
+        priceUpdateDuration time.Duration,
+        imageUpdateDuration time.Duration) error {
 
     bpConfig := influx.BatchPointsConfig{Database: "mtg_cards"}
     bp, err := influx.NewBatchPoints(bpConfig)
@@ -421,8 +490,10 @@ func AddSingleUpdateStatsToDb(client influx.Client,
     fields := map[string]interface{} {
         "cards_updated": cardsUpdated,
         "prices_updated": pricesUpdated,
+        "images_updated": imagesUpdated,
         "card_update_duration": cardUpdateDuration.Seconds(),
-        "price_update_duration": priceUpdateDuration.Seconds()}
+        "price_update_duration": priceUpdateDuration.Seconds(),
+        "image_update_duration": imageUpdateDuration.Seconds()}
 
     point, err := influx.NewPoint("updates",
         nil,

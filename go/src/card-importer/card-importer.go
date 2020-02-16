@@ -94,8 +94,10 @@ func CheckForAndMaybeRunUpdate() {
 
     cardsUpdated := false
     pricesUpdated := false
+    imagesUpdated := false
     cardsUpdateDuration := time.Duration(0)
     pricesUpdateDuration := time.Duration(0)
+    imagesUpdateDuration := time.Duration(0)
 
     // Update cards if necessary
     if onlineVersion.BuildDate.After(dbVersion.BuildDate) {
@@ -130,13 +132,21 @@ func CheckForAndMaybeRunUpdate() {
         }
     }
 
+    // Check to see if we're missing any card images, and if so, try and get them
+    imagesUpdated, imagesUpdateDuration, err = UpdateImages(cardDB, pricesAndStatsDB)
+    if err != nil {
+        log.Print(err)
+    }
+
     // Add the update run stats to the db
     log.Printf("Adding update run stats to db...\n")
     err = carddb.AddSingleUpdateStatsToDb(pricesAndStatsDB,
         cardsUpdated,
         pricesUpdated,
+        imagesUpdated,
         cardsUpdateDuration,
-        pricesUpdateDuration)
+        pricesUpdateDuration,
+        imagesUpdateDuration)
     if err != nil {
         log.Print(err)
     }
@@ -194,7 +204,7 @@ func UpdateCards(cardDB *sql.DB, priceAndStatsDB influx.Client) (time.Duration, 
     if err != nil {
         return updateDuration, err
     }
-    updateDuration = time.Now().Sub(updateStart)
+    updateDuration = time.Since(updateStart)
 
     return updateDuration, nil
 }
@@ -228,7 +238,34 @@ func UpdatePrices(priceAndStatsDB influx.Client, pricesDate time.Time) (time.Dur
         return updateDuration, err
     }
 
-    updateDuration = time.Now().Sub(updateStart)
+    updateDuration = time.Since(updateStart)
 
     return updateDuration, nil
+}
+
+func UpdateImages(cardDB *sql.DB, pricesAndStatsDB influx.Client) (bool, time.Duration, error) {
+    log.Printf("Checking for and downloading any missing card images...\n")
+    updateStartTime := time.Now()
+    updateStats, err := carddb.UpdateCardImages(cardDB)
+    updateDuration := time.Since(updateStartTime)
+    log.Printf("Cards needing images: %d\n", updateStats.CardsNeedingImages())
+    log.Printf("Tokens needing images: %d\n", updateStats.TokensNeedingImages())
+    log.Printf("Images downloaded: %d\n", updateStats.ImagesDownloaded())
+    log.Printf("Images that failed to download: %d\n", updateStats.ImagesFailedToDownload())
+    if err != nil {
+        return false, time.Duration(0), err
+    } else {
+        err = updateStats.AddToDb(pricesAndStatsDB)
+        if err != nil {
+            return false, time.Duration(0), err
+        }
+
+        imagesUpdated := (updateStats.CardsNeedingImages() > 0) ||
+            (updateStats.TokensNeedingImages() > 0)
+        if imagesUpdated {
+            return true, updateDuration, nil
+        } else {
+            return false, time.Duration(0), nil
+        }
+    }
 }

@@ -23,7 +23,7 @@ const (
 )
 
 const (
-    downloadLocation = "/var/card-importer/"
+    downloadLocation = "/var/card-importer/card-data/"
 )
 
 func DownloadAllPrintings(useCachedIfAvailable bool) (map[string]MTGSet, error) {
