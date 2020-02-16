@@ -31,7 +31,7 @@ func main() {
     closeRequest := make(chan os.Signal)
     signal.Notify(closeRequest, syscall.SIGINT)
 
-    log.Printf("Card importer started...\n")
+    log.Printf("Card importer started with PID %d...\n", os.Getpid())
     for {
         select {
         // Handle this one first, if it's available, so that we exit
@@ -255,14 +255,14 @@ func UpdateImages(cardDB *sql.DB, pricesAndStatsDB influx.Client) (bool, time.Du
     if err != nil {
         return false, time.Duration(0), err
     } else {
-        err = updateStats.AddToDb(pricesAndStatsDB)
-        if err != nil {
-            return false, time.Duration(0), err
-        }
-
         imagesUpdated := (updateStats.CardsNeedingImages() > 0) ||
             (updateStats.TokensNeedingImages() > 0)
+
         if imagesUpdated {
+            err = updateStats.AddToDb(pricesAndStatsDB)
+            if err != nil {
+                return false, time.Duration(0), err
+            }
             return true, updateDuration, nil
         } else {
             return false, time.Duration(0), nil
