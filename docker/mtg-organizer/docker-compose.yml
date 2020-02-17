@@ -58,3 +58,20 @@ services:
             - ../../container-volumes/nginx/var-run:/var/run
         ports:
             - "80:80"
+    ldap:
+        image: "osixia/openldap:latest"
+        volumes:
+            - "../../container-volumes/openldap/data:/var/lib/ldap"
+            - "../../container-volumes/openldap/conf:/etc/ldap/slapd.d"
+        environment:
+            LDAP_ORGANISATION: "Arcane Binders"
+            LDAP_DOMAIN: "arcanebinders.com"
+            LDAP_ADMIN_PASSWORD: "ldap_admin_password"
+            LDAP_TLS: "false"
+    phpldapadmin:
+        image: "osixia/phpldapadmin:latest"
+        environment:
+            PHPLDAPADMIN_HTTPS: "false"
+            PHPLDAPADMIN_SERVER_PATH: "http://phpldapadmin/phpldapadmin/"
+            PHPLDAPADMIN_LDAP_HOSTS: "ldap"
+
