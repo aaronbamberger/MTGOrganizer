@@ -49,4 +49,5 @@ services:
             context: ../../go/
             dockerfile: ../docker/card-importer/Dockerfile
         volumes:
-            - ../../container-volumes/card-importer:/var/card-importer
+            - ../../container-volumes/card-importer:/var/card-importer/card-data
+            - ../../web_content/card_face_images:/var/card-importer/card-images

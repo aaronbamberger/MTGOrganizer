@@ -9,6 +9,6 @@ RUN go get -d -v "github.com/go-sql-driver/mysql"
 RUN go get -d -v "github.com/influxdata/influxdb1-client/v2"
 RUN go install card-importer
 
-VOLUME ["/var/card-importer/"]
+VOLUME ["/var/card-importer/card-data/", "/var/card-importer/card-images/"]
 
 ENTRYPOINT ["card-importer"]
