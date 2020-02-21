@@ -6,7 +6,8 @@ import "database/sql"
 
 type CardSearchResult struct {
     Name string `json:"name"`
-    SetKeyruneCode string `json:"set_keyrune_code"`
+    SetName string `json:"setName"`
+    SetKeyruneCode string `json:"setKeyruneCode"`
 }
 
 type DBFetchContext struct {
@@ -26,7 +27,7 @@ func NewDBFetchContext(db *sql.DB) (*DBFetchContext, error) {
     fetchContext.cardSearchQuery, err = fetchContext.dbConn.PrepareContext(
         context.Background(),
         `SELECT DISTINCT
-        all_cards.name, sets.keyrune_code
+        all_cards.name, sets.name, sets.keyrune_code
         FROM
         all_cards INNER JOIN sets ON all_cards.set_id = sets.set_id
         WHERE all_cards.name RLIKE ?
@@ -49,12 +50,17 @@ func (fc *DBFetchContext) SearchCardsByName(partialName string) ([]CardSearchRes
 
     for res.Next() {
         var cardName string
+        var setName string
         var setKeyruneCode string
-        err = res.Scan(&cardName, &setKeyruneCode)
+        err = res.Scan(&cardName, &setName, &setKeyruneCode)
         if err != nil {
             return nil, err
         }
-        cards = append(cards, CardSearchResult{Name: cardName, SetKeyruneCode: setKeyruneCode})
+        cards = append(cards,
+            CardSearchResult{
+                Name: cardName,
+                SetName: setName,
+                SetKeyruneCode: setKeyruneCode})
     }
     if err = res.Err(); err != nil {
         return nil, err

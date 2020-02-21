@@ -62,7 +62,10 @@ class WebsocketHelloWorld extends React.Component {
 
 function CardSearchResultsTable(props) {
   const rows = props.cards.map((cardInfo) =>
-    <CardSearchResultRow cardName={cardInfo.name} setCode={cardInfo.set_keyrune_code} />
+    <CardSearchResultRow
+      cardName={cardInfo.name}
+      setName={cardInfo.setName}
+      setCode={cardInfo.setKeyruneCode} />
     );
 
   return (
@@ -86,14 +89,16 @@ function CardSearchResultRow(props) {
     return (
       <tr>
         <td>{props.cardName}</td>
-        <td><SetSymbol setCode={props.setCode} /></td>
+        <td><SetSymbol setName={props.setName} setCode={props.setCode} /></td>
       </tr>
     );
 }
 
 function SetSymbol(props) {
   return (
-    <span className={"ss ss-" + props.setCode.toLowerCase()} />
+    <span
+      title={props.setName}
+      className={"ss ss-" + props.setCode.toLowerCase()} />
   );
 }
 
