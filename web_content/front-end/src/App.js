@@ -45,13 +45,6 @@ class WebsocketHelloWorld extends React.Component {
   }
 
   render() {
-    const cardTableRows = this.state.cards.map((cardInfo) =>
-      <tr>
-          <td>{cardInfo.name}</td>
-          <td><span className={"ss ss-" + cardInfo.set_keyrune_code.toLowerCase()}></span></td>
-        </tr>
-      );
-
     return (
       <div id="card_search">
         <form onSubmit={this.handleSubmit}>
@@ -61,22 +54,47 @@ class WebsocketHelloWorld extends React.Component {
          </label>
           <input type="submit" value="Submit" />
         </form>
-        <div id="card_results">
-          <table>
-            <thead>
-              <tr>
-                <th>Card Name</th>
-                <th>Set</th>
-              </tr>
-            </thead>
-            <tbody>
-              {cardTableRows}
-            </tbody>
-          </table>
-        </div>
+        <CardSearchResultsTable cards={this.state.cards} />
       </div>
     );
   }
+}
+
+function CardSearchResultsTable(props) {
+  const rows = props.cards.map((cardInfo) =>
+    <CardSearchResultRow cardName={cardInfo.name} setCode={cardInfo.set_keyrune_code} />
+    );
+
+  return (
+    <div id="card_results">
+      <table>
+        <thead>
+          <tr>
+            <th>Card Name</th>
+            <th>Set</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function CardSearchResultRow(props) {
+    return (
+      <tr>
+        <td>{props.cardName}</td>
+        <td><SetSymbol setCode={props.setCode} /></td>
+      </tr>
+    );
+}
+
+function SetSymbol(props) {
+  return (
+    <span className={"ss ss-" + props.setCode.toLowerCase()} />
+  );
 }
 
 export default App;

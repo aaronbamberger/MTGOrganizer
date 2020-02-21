@@ -21,6 +21,7 @@ go/src/card-importer/card-importer
 go/src/card-image-downloader/card-image-downloader
 go/src/card-stats/card-stats
 go/src/debug-playground/debug-playground
+go/src/organizer-backend/organizer-backend
 AllPrintings.*
 AllPrices.*
 version.*

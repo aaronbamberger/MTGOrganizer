@@ -39,7 +39,7 @@ func NewDBFetchContext(db *sql.DB) (*DBFetchContext, error) {
 }
 
 func (fc *DBFetchContext) SearchCardsByName(partialName string) ([]CardSearchResult, error) {
-    res, err := fc.cardSearchQuery.Query(fmt.Sprintf("^%s", partialName))
+    res, err := fc.cardSearchQuery.Query(fmt.Sprintf("\\b%s", partialName))
     if err != nil {
         return nil, err
     }
