@@ -1,21 +1,33 @@
 import React from 'react';
+import {Link} from "react-router-dom";
 
-import {SetSymbol} from './CardComponents.js'
+import {SetSymbol} from './CardComponents.js';
+import {REQUEST_TYPES} from './Constants.js';
 
 class CardSearch extends React.Component {
   constructor(props) {
     super(props);
+
+    this.state = {cards: []}
     
     this.handleInput = this.handleInput.bind(this);
   }
 
   handleInput(event) {
     if (event.target.value.length > 1) {
-      const request = JSON.stringify({"type": 0, "value": event.target.value});
+      const request = JSON.stringify(
+        {
+          "type": REQUEST_TYPES.CARD_SEARCH_REQUEST,
+          "value": event.target.value
+        });
       this.props.backendRequest(request)
     } else {
-      this.setState({"cards": []});
+      this.setState({cards: []});
     }
+  }
+
+  receiveNewCards(newCards) {
+    this.setState({cards: newCards});
   }
 
   render() {
@@ -27,7 +39,7 @@ class CardSearch extends React.Component {
             <input type="text" onInput={this.handleInput} />
           </label>
         </form>
-        <CardSearchResultsTable cards={this.props.cards} />
+        <CardSearchResultsTable cards={this.state.cards} />
       </div>
     );
   }
@@ -36,7 +48,9 @@ class CardSearch extends React.Component {
 function CardSearchResultsTable(props) {
   const rows = props.cards.map((cardInfo) =>
     <CardSearchResultRow
+      key={cardInfo.uuid}
       cardName={cardInfo.name}
+      cardUUID={cardInfo.uuid}
       setName={cardInfo.setName}
       setCode={cardInfo.setKeyruneCode} />
     );
@@ -61,7 +75,11 @@ function CardSearchResultsTable(props) {
 function CardSearchResultRow(props) {
     return (
       <tr>
-        <td>{props.cardName}</td>
+        <td>
+          <Link to={"/card/" + props.cardUUID}>
+            {props.cardName}
+          </Link>
+        </td>
         <td><SetSymbol setName={props.setName} setCode={props.setCode} /></td>
       </tr>
     );

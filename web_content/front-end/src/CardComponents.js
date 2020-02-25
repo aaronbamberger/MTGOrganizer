@@ -1,5 +1,7 @@
 import React from 'react';
-import './Keyrune-master/css/keyrune.css'
+
+import './Keyrune-master/css/keyrune.css';
+import {BACKEND_HOSTNAME} from './Constants.js';
 
 function SetSymbol(props) {
   return (
@@ -9,4 +11,12 @@ function SetSymbol(props) {
   );
 }
 
-export {SetSymbol};
+function CardImage(props) {
+  return (
+    <img
+      src={'http://' + BACKEND_HOSTNAME + '/static_content/card_face_images/' + props.uuid + '.png'}
+      alt={props.name} />
+  );
+}
+
+export {SetSymbol, CardImage};

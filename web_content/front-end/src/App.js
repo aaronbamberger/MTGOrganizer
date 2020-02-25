@@ -1,13 +1,14 @@
 import React from 'react';
 import {
-    BrowserRouter as Router,
-    Switch,
-    Route,
-    Link
+  BrowserRouter as Router,
+  Switch,
+  Route
 } from "react-router-dom";
 import logo from './logo.svg';
 import './App.css';
-import {CardSearch} from './CardSearch.js'
+import CardDetail from './CardDetail.js';
+import {CardSearch} from './CardSearch.js';
+import {BACKEND_HOSTNAME, RESPONSE_TYPES} from './Constants.js';
 
 function App() {
   return (
@@ -23,11 +24,12 @@ class MTGOrganizer extends React.Component {
   constructor(props) {
     super(props);
 
-    this.state = {cardSearchCards: []}
-
-    this.backendSocket = new WebSocket('ws://192.168.50.185:8085/api');
+    this.backendSocket = new WebSocket('ws://' + BACKEND_HOSTNAME + ':8085/api');
     this.backendSocket.addEventListener('open', this.handleWebsocketOpen.bind(this));
     this.backendSocket.addEventListener('message', this.handleWebsocketMessage.bind(this));
+
+    this.cardSearch = React.createRef();
+    this.cardDetail = React.createRef();
 
     this.backendRequest = this.backendRequest.bind(this);
   }
@@ -48,14 +50,23 @@ class MTGOrganizer extends React.Component {
 
   handleWebsocketMessage(event) {
     const response = JSON.parse(event.data);
-    if (response.type == 1) {
-      this.setState({cardSearchCards: response.value});
+    if (response.type === RESPONSE_TYPES.CARD_SEARCH_RESPONSE) {
+      this.cardSearch.current.receiveNewCards(response.value);
+    } else if (response.type === RESPONSE_TYPES.CARD_DETAIL_RESPONSE) {
+      this.cardDetail.current.receiveCardDetail(response.value);
     }
   }
 
   render() {
     return (
-      <CardSearch backendRequest={this.backendRequest} cards={this.state.cardSearchCards} />
+      <Switch>
+        <Route path="/card/:uuid">
+          <CardDetail wrappedComponentRef={this.cardDetail} backendRequest={this.backendRequest} />
+        </Route>
+        <Route path="/">
+          <CardSearch ref={this.cardSearch} backendRequest={this.backendRequest} />
+        </Route>
+      </Switch>
     );
   }
 }

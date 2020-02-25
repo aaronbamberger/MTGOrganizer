@@ -4,12 +4,15 @@ type RequestType int
 type ResponseType int
 
 const (
-    CardSearchRequest RequestType = iota
+    ApiTypesRequest RequestType = iota
+    CardSearchRequest
+    CardDetailRequest
 )
 
 const (
     ErrorResponse ResponseType = iota
     CardSearchResponse
+    CardDetailResponse
 )
 
 type RequestMessage struct {

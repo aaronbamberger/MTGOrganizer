@@ -31,7 +31,7 @@ func HandleApi(resp http.ResponseWriter, req *http.Request) {
 
     // Connect to the mariadb database
     cardDB, err := sql.Open("mysql",
-        "app_user:app_db_password@tcp(172.18.0.8)/mtg_cards?parseTime=true")
+        "app_user:app_db_password@tcp(172.18.0.5)/mtg_cards?parseTime=true")
 	if err != nil {
 		log.Print(err)
         return
@@ -56,7 +56,6 @@ func HandleApi(resp http.ResponseWriter, req *http.Request) {
             switch messageType {
             case websocket.CloseMessage:
                 close(doneChan)
-                conn.Close()
                 done = true
             case websocket.TextMessage:
                 rawMessage, err := ioutil.ReadAll(reader)
@@ -73,6 +72,8 @@ func HandleApi(resp http.ResponseWriter, req *http.Request) {
                 switch message.Type {
                 case CardSearchRequest:
                     go cardSearch(cardDB, message.Value, doneChan, respChan)
+                case CardDetailRequest:
+                    go cardDetail(cardDB, message.Value, doneChan, respChan)
                 }
 
             default:
