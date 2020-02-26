@@ -17,7 +17,7 @@ class CardSearch extends React.Component {
     if (event.target.value.length > 1) {
       const request = JSON.stringify(
         {
-          "type": REQUEST_TYPES.CARD_SEARCH_REQUEST,
+          "type": this.props.apiTypesMap.CardSearchRequest,
           "value": event.target.value
         });
       this.props.backendRequest(request)

@@ -33,7 +33,7 @@ class CardDetail extends React.Component {
   sendRequestForUpdatedCardInfo() {
     const request = JSON.stringify(
       {
-        "type": REQUEST_TYPES.CARD_DETAIL_REQUEST,
+        "type": this.props.apiTypesMap.CardDetailRequest,
         "value": this.uuid
       });
     this.props.backendRequest(request);
@@ -45,9 +45,12 @@ class CardDetail extends React.Component {
       if (this.state.CardDetail.variations.length > 0) {
         variationLinks = (
           <div>
-            <Link to={"/card/" + this.uuid}>1</Link>
+            Variations:
             {this.state.CardDetail.variations.map((variationUUID, i) =>
-              <Link to={"/card/" + variationUUID}>{i + 2}</Link>)};
+              <Link key={variationUUID} to={"/card/" + variationUUID}>
+                {i + 1}
+              </Link>)}
+              &nbsp;
           </div>
         );
       }

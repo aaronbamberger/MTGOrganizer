@@ -15,7 +15,8 @@ function CardImage(props) {
   return (
     <img
       src={'http://' + BACKEND_HOSTNAME + '/static_content/card_face_images/' + props.uuid + '.png'}
-      alt={props.name} />
+      alt={props.name}
+      style={{width: '20%', height: '20%'}} />
   );
 }
 

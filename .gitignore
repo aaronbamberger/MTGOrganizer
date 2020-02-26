@@ -26,4 +26,6 @@ AllPrintings.*
 AllPrices.*
 version.*
 go/pkg/
+go/bin/
 go/src/github.com/
+go/src/golang.org/

@@ -279,6 +279,7 @@ func cardDetail(db *sql.DB,
         sendError(respChan, err)
         return
     }
+    card.Printings = make([]string, 0)
     for printings.Next() {
         var setCode string
         err = printings.Scan(&setCode)
@@ -307,6 +308,7 @@ func cardDetail(db *sql.DB,
         sendError(respChan, err)
         return
     }
+    card.Variations = make([]string, 0)
     for variations.Next() {
         var variationUUID string
         err = variations.Scan(&variationUUID)

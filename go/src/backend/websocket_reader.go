@@ -70,6 +70,8 @@ func HandleApi(resp http.ResponseWriter, req *http.Request) {
                     continue
                 }
                 switch message.Type {
+                case ApiTypesRequest:
+                    go apiTypes(doneChan, respChan)
                 case CardSearchRequest:
                     go cardSearch(cardDB, message.Value, doneChan, respChan)
                 case CardDetailRequest:

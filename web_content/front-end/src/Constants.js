@@ -1,15 +1,9 @@
 const BACKEND_HOSTNAME = "192.168.50.185"
 
-const REQUEST_TYPES = Object.freeze({
-  "API_TYPES_REQUEST": 0,
-  "CARD_SEARCH_REQUEST": 1,
-  "CARD_DETAIL_REQUEST": 2,
-});
+// We dynamically request the api name to type mappings when we connect to the
+// backend, but we have to have a statically determined type for the request
+// and response messages for the rest of the types, which is what these are
+const API_TYPES_REQUEST = 0
+const API_TYPES_RESPONSE = 0
 
-const RESPONSE_TYPES = Object.freeze({
-  "ERROR_RESPONSE": 0,
-  "CARD_SEARCH_RESPONSE": 1,
-  "CARD_DETAIL_RESPONSE": 2,
-});
-
-export {BACKEND_HOSTNAME, REQUEST_TYPES, RESPONSE_TYPES}
+export {BACKEND_HOSTNAME, API_TYPES_REQUEST, API_TYPES_RESPONSE}

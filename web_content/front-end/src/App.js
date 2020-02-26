@@ -8,7 +8,7 @@ import logo from './logo.svg';
 import './App.css';
 import CardDetail from './CardDetail.js';
 import {CardSearch} from './CardSearch.js';
-import {BACKEND_HOSTNAME, RESPONSE_TYPES} from './Constants.js';
+import {BACKEND_HOSTNAME, API_TYPES_REQUEST, API_TYPES_RESPONSE} from './Constants.js';
 
 function App() {
   return (
@@ -28,6 +28,8 @@ class MTGOrganizer extends React.Component {
     this.backendSocket.addEventListener('open', this.handleWebsocketOpen.bind(this));
     this.backendSocket.addEventListener('message', this.handleWebsocketMessage.bind(this));
 
+    this.state = {socketConnected: false, apiTypesReceived: false, apiTypesMap: {}};
+
     this.cardSearch = React.createRef();
     this.cardDetail = React.createRef();
 
@@ -45,29 +47,46 @@ class MTGOrganizer extends React.Component {
   }
 
   handleWebsocketOpen(event) {
+    this.setState({socketConnected: true});
+    // Request the list of api name to type mappings from the backend
+    this.backendRequest(JSON.stringify({"type": API_TYPES_REQUEST, "value": ""}))
     console.log("Websocket open: " + event);
   }
 
   handleWebsocketMessage(event) {
     const response = JSON.parse(event.data);
-    if (response.type === RESPONSE_TYPES.CARD_SEARCH_RESPONSE) {
+    if (response.type === API_TYPES_RESPONSE) {
+      this.setState({apiTypesMap: response.value, apiTypesReceived: true})
+    } else if (response.type === this.state.apiTypesMap.CardSearchResponse) {
       this.cardSearch.current.receiveNewCards(response.value);
-    } else if (response.type === RESPONSE_TYPES.CARD_DETAIL_RESPONSE) {
+    } else if (response.type === this.state.apiTypesMap.CardDetailResponse) {
       this.cardDetail.current.receiveCardDetail(response.value);
     }
   }
 
   render() {
-    return (
-      <Switch>
-        <Route path="/card/:uuid">
-          <CardDetail wrappedComponentRef={this.cardDetail} backendRequest={this.backendRequest} />
-        </Route>
-        <Route path="/">
-          <CardSearch ref={this.cardSearch} backendRequest={this.backendRequest} />
-        </Route>
-      </Switch>
-    );
+    if (!this.state.apiTypesReceived) {
+      return (
+        <h2>Loading...</h2>
+      );
+    } else {
+      return (
+        <Switch>
+          <Route path="/card/:uuid">
+            <CardDetail
+              wrappedComponentRef={this.cardDetail}
+              backendRequest={this.backendRequest}
+              apiTypesMap={this.state.apiTypesMap} />
+          </Route>
+          <Route path="/">
+            <CardSearch
+              ref={this.cardSearch}
+              backendRequest={this.backendRequest}
+              apiTypesMap={this.state.apiTypesMap} />
+          </Route>
+        </Switch>
+      );
+    }
   }
 }
 
