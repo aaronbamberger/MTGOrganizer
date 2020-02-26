@@ -55,18 +55,77 @@ class CardDetail extends React.Component {
         );
       }
 
+      let legalities = null
+      if (Object.keys(this.state.CardDetail.legalities).length > 0) {
+        legalities = (
+          <SortedKeyValueTable
+            keyHeader="Game Format"
+            valueHeader="Legality"
+            data={this.state.CardDetail.legalities} />
+        );
+      }
+
+      let leadershipSkills = null
+      if (Object.keys(this.state.CardDetail.leadershipSkills).length > 0) {
+        leadershipSkills = (
+          <SortedKeyValueTable
+            keyHeader="Game Format"
+            valueHeader="Leader Legal?"
+            data={this.state.CardDetail.leadershipSkills} />
+        );
+      }
+
       return (
         <div>
           <div>Name: {this.state.CardDetail.name}</div>
           <div>Artist: {this.state.CardDetail.artist}</div>
           <CardImage uuid={this.uuid} name={this.state.CardDetail.name} />
           {variationLinks}
+          {legalities}
+          {leadershipSkills}
         </div>
       );
     } else {
       return (<div></div>);
     }
   }
+}
+
+function SortedKeyValueTable(props) {
+  const keys = Object.keys(props.data);
+  keys.sort();
+
+  const rows = keys.map((key) =>
+    <KeyValueTableRow
+      key={key}
+      dataKey={key}
+      dataValue={props.data[key]} />
+  );
+
+   return (
+    <div id={props.tableName}>
+      <table>
+        <thead>
+          <tr>
+            <th>{props.keyHeader}</th>
+            <th>{props.valueHeader}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function KeyValueTableRow(props) {
+  return (
+    <tr>
+      <td>{props.dataKey}</td>
+      <td>{props.dataValue.toString()}</td>
+    </tr>
+  );
 }
 
 export default withRouter(CardDetail);
