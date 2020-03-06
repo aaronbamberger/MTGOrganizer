@@ -1,10 +1,51 @@
 package main
 
-import "fmt"
+//import "fmt"
 import "log"
-import "mtgcards"
+//import "mtgcards"
+
+import "github.com/go-ldap/ldap/v3"
+//import "golang.org/x/crypto/bcrypt"
 
 func main() {
+
+    conn, err := ldap.Dial("tcp", "172.18.0.7:389")
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer conn.Close()
+
+    err = conn.Bind("cn=admin,dc=arcanebinders,dc=com", "ldap_admin_password")
+    if err != nil {
+        log.Fatalf("Bind error: %s", err)
+    }
+
+    userSearchRequest := ldap.NewSearchRequest(
+        "dc=arcanebinders,dc=com",
+        ldap.ScopeWholeSubtree,
+        ldap.NeverDerefAliases,
+        0,
+        0,
+        false,
+        "(objectClass=account)",
+        []string{"dn", "uid"},
+        nil)
+    resp, err := conn.Search(userSearchRequest)
+    if err != nil {
+        log.Fatalf("Search error: %s", err)
+    }
+
+    log.Print("Response: %v", resp)
+
+    /*
+    hashedPw, err := bcrypt.GenerateFromPassword([]byte("password"), 8)
+    if err != nil {
+        log.Fatal(err)
+    }
+    log.Print("Hashed pw: %s", string(hashedPw))
+    */
+
+    /*
     oldSets, err := mtgcards.DebugParseAllPrintingsGz("AllPrintings.json.gz.old")
     if err != nil {
         log.Fatal(err)
@@ -97,5 +138,6 @@ func main() {
     fmt.Printf("Expected new tokens: %d\n", expectedNewTokens)
     fmt.Printf("Expected updated cards: %d\n", expectedUpdatedCards)
     fmt.Printf("Expected updated tokens: %d\n", expectedUpdatedTokens)
+    */
 }
 

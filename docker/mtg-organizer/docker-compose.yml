@@ -60,9 +60,11 @@ services:
             - "80:80"
     ldap:
         image: "osixia/openldap:latest"
+        command: "--copy-service"
         volumes:
             - "../../container-volumes/openldap/data:/var/lib/ldap"
             - "../../container-volumes/openldap/conf:/etc/ldap/slapd.d"
+            - "../../container-volumes/openldap/startup_ldif:/container/service/slapd/assets/config/bootstrap/ldif/custom"
         environment:
             LDAP_ORGANISATION: "Arcane Binders"
             LDAP_DOMAIN: "arcanebinders.com"
@@ -70,8 +72,10 @@ services:
             LDAP_TLS: "false"
     phpldapadmin:
         image: "osixia/phpldapadmin:latest"
+        command: "--copy-service --loglevel debug"
+        volumes:
+            - "../../container-volumes/phpldapadmin/env:/container/environment/01-custom"
         environment:
             PHPLDAPADMIN_HTTPS: "false"
             PHPLDAPADMIN_SERVER_PATH: "http://phpldapadmin/phpldapadmin/"
-            PHPLDAPADMIN_LDAP_HOSTS: "ldap"
 

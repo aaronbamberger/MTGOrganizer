@@ -41,14 +41,19 @@ class CardDetail extends React.Component {
 
   render() {
     if (this.state.CardDetail) {
+      let variations = [ this.uuid ].concat(this.state.CardDetail.variations);
+      variations.sort();
       let variationLinks = null
-      if (this.state.CardDetail.variations.length > 0) {
+      if (variations.length > 1) {
         variationLinks = (
           <div>
             Variations:
-            {this.state.CardDetail.variations.map((variationUUID, i) =>
+            {variations.map((variationUUID, i) =>
               <Link key={variationUUID} to={"/card/" + variationUUID}>
-                {i + 1}
+                <CardImage
+                  uuid={variationUUID}
+                  sizePercent={5}
+                  isDisabled={this.uuid === variationUUID} />
               </Link>)}
               &nbsp;
           </div>
@@ -79,7 +84,10 @@ class CardDetail extends React.Component {
         <div>
           <div>Name: {this.state.CardDetail.name}</div>
           <div>Artist: {this.state.CardDetail.artist}</div>
-          <CardImage uuid={this.uuid} name={this.state.CardDetail.name} />
+          <CardImage
+            uuid={this.uuid}
+            name={this.state.CardDetail.name}
+            sizePercent={20} />
           {variationLinks}
           {legalities}
           {leadershipSkills}

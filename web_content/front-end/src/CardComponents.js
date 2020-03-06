@@ -12,11 +12,17 @@ function SetSymbol(props) {
 }
 
 function CardImage(props) {
+  const imageStyle = {
+    width: props.sizePercent + '%',
+    height: props.sizePercent + '%',
+    opacity: props.isDisabled ? '50%' : '100%'}
+
+
   return (
     <img
       src={'http://' + BACKEND_HOSTNAME + '/static_content/card_face_images/' + props.uuid + '.png'}
       alt={props.name}
-      style={{width: '20%', height: '20%'}} />
+      style={imageStyle} />
   );
 }
 
