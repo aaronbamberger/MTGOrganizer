@@ -1,6 +1,7 @@
 package main
 
 import "database/sql"
+import "fmt"
 import _ "github.com/go-sql-driver/mysql"
 import influx "github.com/influxdata/influxdb1-client/v2"
 import "log"
@@ -10,6 +11,13 @@ import "os"
 import "os/signal"
 import "syscall"
 import "time"
+
+const (
+    cardDBUrl = "carddb"
+    cardPricesDBUrl = "card_prices_db"
+    appUsername = "app_user"
+    appPassword = "app_db_password"
+)
 
 func main() {
     // Create a ticker that will signal the program to check for updates
@@ -54,8 +62,9 @@ func main() {
 
 func CheckForAndMaybeRunUpdate() {
 	// Connect to the mariadb database
-	cardDB, err := sql.Open("mysql",
-        "app_user:app_db_password@tcp(card_db)/mtg_cards?parseTime=true")
+    cardDBConnStr := fmt.Sprintf("%s:%s@tcp(%s)/mtg_cards?parseTime=true",
+        appUsername, appPassword, cardDBUrl)
+	cardDB, err := sql.Open("mysql", cardDBConnStr)
 	if err != nil {
 		log.Print(err)
         return
@@ -64,10 +73,11 @@ func CheckForAndMaybeRunUpdate() {
 	cardDB.SetMaxIdleConns(1000)
 
     // Connect to the influxdb database
+    cardPricesDBAddr := fmt.Sprintf("http://%s:8086", cardPricesDBUrl)
     influxClientConfig := influx.HTTPConfig{
-        Addr: "http://card_prices_db:8086",
-        Username: "app_user",
-        Password: "app_db_password"}
+        Addr: cardPricesDBAddr,
+        Username: appUsername,
+        Password: appPassword}
 
     pricesAndStatsDB, err := influx.NewHTTPClient(influxClientConfig)
     if err != nil {
