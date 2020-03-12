@@ -13,7 +13,7 @@ import "syscall"
 import "time"
 
 const (
-    cardDBUrl = "carddb"
+    cardDBUrl = "card_db"
     cardPricesDBUrl = "card_prices_db"
     appUsername = "app_user"
     appPassword = "app_db_password"
