@@ -59,6 +59,8 @@ services:
         ports:
             - "80:80"
     ldap:
+        #build:
+        #    context: "../openldap/"
         image: "osixia/openldap:latest"
         command: "--copy-service"
         volumes:
@@ -72,7 +74,7 @@ services:
             LDAP_TLS: "false"
     phpldapadmin:
         image: "osixia/phpldapadmin:latest"
-        command: "--copy-service --loglevel debug"
+        command: "--copy-service"
         volumes:
             - "../../container-volumes/phpldapadmin/env:/container/environment/01-custom"
         environment:
