@@ -1,6 +1,0 @@
-PHPLDAPADMIN_LDAP_HOSTS:
-    - ldap:
-        - server:
-            - tls: false
-            - base: "array('cn=config', 'dc=arcanebinders,dc=com')"
-
