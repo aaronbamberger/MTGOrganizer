@@ -47,7 +47,7 @@ services:
             dockerfile: ../docker/card-importer/Dockerfile
         volumes:
             - ../../container-volumes/card-importer:/var/card-importer/card-data
-            - ../../web_content/card_face_images:/var/card-importer/card-images
+            - ../../web_content/static_content/card_face_images:/var/card-importer/card-images
     nginx:
         image: "nginx:latest"
         volumes:
