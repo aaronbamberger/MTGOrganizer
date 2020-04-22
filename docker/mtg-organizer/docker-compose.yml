@@ -14,8 +14,8 @@ services:
         image: "phpmyadmin/phpmyadmin:latest"
         environment:
             PMA_HOST: "card_db"
-            PMA_USER: "app_user"
-            PMA_PASSWORD: "app_db_password"
+            PMA_USER: "root"
+            PMA_PASSWORD: "db_password"
             PMA_ABSOLUTE_URI: "http://phpmyadmin/phpmyadmin/"
     card_prices_db:
         image: "influxdb:latest"
@@ -58,4 +58,18 @@ services:
             - ../../container-volumes/nginx/var-run:/var/run
         ports:
             - "80:80"
+    hydra:
+        image: "oryd/hydra:latest"
+        command: serve all --dangerous-force-http
+        environment:
+            SECRETS_SYSTEM: "this_is_a_temporary_development_system_secret"
+            DSN: "mysql://hydra_user:hydra_password@tcp(card_db)/hydra"
+            URLS_SELF_ISSUER: "http://192.168.50.185/"
+            URLS_CONSENT: "http://192.168.50.185:3000/auth/consent"
+            URLS_LOGIN: "http://192.168.50.185:3000/auth/login"
+            SERVE_PUBLIC_CORS_ENABLED: "true"
+            SERVE_PUBLIC_CORS_ALLOWED_ORIGINS: "[http://192.168.50.185:3000]"
+            SERVE_PUBLIC_CORS_ALLOWED_METHODS: "[POST,GET,PUT,PATCH,DELETE]"
+            SERVE_PUBLIC_CORS_ALLOWED_HEADERS: "[Authorization]"
+            SERVE_PUBLIC_CORS_EXPOSED_HEADERS: "[Content-Type]"
 

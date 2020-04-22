@@ -1,9 +1,7 @@
 import React from 'react';
 import {withRouter, Link} from 'react-router-dom';
 
-import {REQUEST_TYPES} from './Constants.js';
 import {CardImage} from './CardComponents.js';
-
 
 class CardDetail extends React.Component {
   constructor(props) {
@@ -20,7 +18,7 @@ class CardDetail extends React.Component {
   }
 
   componentDidUpdate() {
-    if (this.uuid != this.props.match.params.uuid) {
+    if (this.uuid !== this.props.match.params.uuid) {
       this.uuid = this.props.match.params.uuid;
       this.sendRequestForUpdatedCardInfo();
     }

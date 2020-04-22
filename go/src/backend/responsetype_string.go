@@ -10,13 +10,14 @@ func _() {
 	var x [1]struct{}
 	_ = x[ApiTypesResponse-0]
 	_ = x[ErrorResponse-1]
-	_ = x[CardSearchResponse-2]
-	_ = x[CardDetailResponse-3]
+	_ = x[LoginChallengeResponse-2]
+	_ = x[CardSearchResponse-3]
+	_ = x[CardDetailResponse-4]
 }
 
-const _ResponseType_name = "ApiTypesResponseErrorResponseCardSearchResponseCardDetailResponse"
+const _ResponseType_name = "ApiTypesResponseErrorResponseLoginChallengeResponseCardSearchResponseCardDetailResponse"
 
-var _ResponseType_index = [...]uint8{0, 16, 29, 47, 65}
+var _ResponseType_index = [...]uint8{0, 16, 29, 51, 69, 87}
 
 func (i ResponseType) String() string {
 	if i < 0 || i >= ResponseType(len(_ResponseType_index)-1) {

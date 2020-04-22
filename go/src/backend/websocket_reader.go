@@ -72,6 +72,8 @@ func HandleApi(resp http.ResponseWriter, req *http.Request) {
                 switch message.Type {
                 case ApiTypesRequest:
                     go apiTypes(doneChan, respChan)
+                case LoginChallengeCheck:
+                    go checkLoginChallenge(message.Value, doneChan, respChan)
                 case CardSearchRequest:
                     go cardSearch(cardDB, message.Value, doneChan, respChan)
                 case CardDetailRequest:

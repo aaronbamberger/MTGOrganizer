@@ -2,7 +2,6 @@ import React from 'react';
 import {Link} from "react-router-dom";
 
 import {SetSymbol} from './CardComponents.js';
-import {REQUEST_TYPES} from './Constants.js';
 
 class CardSearch extends React.Component {
   constructor(props) {

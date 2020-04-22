@@ -3,10 +3,11 @@ import {
   BrowserRouter as Router,
   Switch,
   Route
-} from "react-router-dom";
-import logo from './logo.svg';
+} from 'react-router-dom';
 import './App.css';
 import CardDetail from './CardDetail.js';
+import LoginPage from './LoginPage.js';
+import FrontPageLoggedOut from './FrontPageLoggedOut.js';
 import {CardSearch} from './CardSearch.js';
 import {BACKEND_HOSTNAME, API_TYPES_REQUEST, API_TYPES_RESPONSE} from './Constants.js';
 
@@ -28,8 +29,14 @@ class MTGOrganizer extends React.Component {
     this.backendSocket.addEventListener('open', this.handleWebsocketOpen.bind(this));
     this.backendSocket.addEventListener('message', this.handleWebsocketMessage.bind(this));
 
-    this.state = {socketConnected: false, apiTypesReceived: false, apiTypesMap: {}};
+    this.state = {
+      loggedIn: false,
+      socketConnected: false,
+      apiTypesReceived: false,
+      apiTypesMap: {}
+    };
 
+    this.loginPage = React.createRef();
     this.cardSearch = React.createRef();
     this.cardDetail = React.createRef();
 
@@ -55,12 +62,17 @@ class MTGOrganizer extends React.Component {
 
   handleWebsocketMessage(event) {
     const response = JSON.parse(event.data);
+    console.log('Response type: ' + response.type);
     if (response.type === API_TYPES_RESPONSE) {
       this.setState({apiTypesMap: response.value, apiTypesReceived: true})
+      console.log('Received types map');
     } else if (response.type === this.state.apiTypesMap.CardSearchResponse) {
       this.cardSearch.current.receiveNewCards(response.value);
     } else if (response.type === this.state.apiTypesMap.CardDetailResponse) {
       this.cardDetail.current.receiveCardDetail(response.value);
+    } else if (response.type === this.state.apiTypesMap.LoginChallengeResponse) {
+      console.log('In main app, received ' + response.value);
+      this.loginPage.current.receiveLoginChallengeResult(response.value);
     }
   }
 
@@ -68,6 +80,23 @@ class MTGOrganizer extends React.Component {
     if (!this.state.apiTypesReceived) {
       return (
         <h2>Loading...</h2>
+      );
+    } else if (!this.state.loggedIn) {
+      return (
+        <Switch>
+          <Route path="/auth/login">
+            <LoginPage
+              wrappedComponentRef={this.loginPage}
+              backendRequest={this.backendRequest}
+              apiTypesMap={this.state.apiTypesMap} />
+          </Route>
+          <Route path="/auth/consent">
+            <h2>Consent Page</h2>
+          </Route>
+          <Route path="/">
+            <FrontPageLoggedOut />
+          </Route>
+        </Switch>
       );
     } else {
       return (

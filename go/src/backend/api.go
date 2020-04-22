@@ -7,6 +7,8 @@ type ResponseType int
 
 const (
     ApiTypesRequest RequestType = iota
+    LoginChallengeCheck
+    LoginRequest
     CardSearchRequest
     CardDetailRequest
 )
@@ -14,18 +16,22 @@ const (
 const (
     ApiTypesResponse ResponseType = iota
     ErrorResponse
+    LoginChallengeResponse
     CardSearchResponse
     CardDetailResponse
 )
 
 var requestTypes  = [...]RequestType{
     ApiTypesRequest,
+    LoginChallengeCheck,
+    LoginRequest,
     CardSearchRequest,
     CardDetailRequest}
 
 var responseTypes = [...]ResponseType{
     ApiTypesResponse,
     ErrorResponse,
+    LoginChallengeResponse,
     CardSearchResponse,
     CardDetailResponse}
 

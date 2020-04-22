@@ -9,13 +9,15 @@ func _() {
 	// Re-run the stringer command to generate them again.
 	var x [1]struct{}
 	_ = x[ApiTypesRequest-0]
-	_ = x[CardSearchRequest-1]
-	_ = x[CardDetailRequest-2]
+	_ = x[LoginChallengeCheck-1]
+	_ = x[LoginRequest-2]
+	_ = x[CardSearchRequest-3]
+	_ = x[CardDetailRequest-4]
 }
 
-const _RequestType_name = "ApiTypesRequestCardSearchRequestCardDetailRequest"
+const _RequestType_name = "ApiTypesRequestLoginChallengeCheckLoginRequestCardSearchRequestCardDetailRequest"
 
-var _RequestType_index = [...]uint8{0, 15, 32, 49}
+var _RequestType_index = [...]uint8{0, 15, 34, 46, 63, 80}
 
 func (i RequestType) String() string {
 	if i < 0 || i >= RequestType(len(_RequestType_index)-1) {
