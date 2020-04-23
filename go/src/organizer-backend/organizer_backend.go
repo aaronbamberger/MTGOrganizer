@@ -3,7 +3,6 @@ package main
 import "backend"
 import "net/http"
 import "log"
-import _ "github.com/go-sql-driver/mysql"
 
 func main() {
     http.HandleFunc("/api", backend.HandleApi)

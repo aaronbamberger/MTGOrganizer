@@ -7,6 +7,7 @@ import {
 import './App.css';
 import CardDetail from './CardDetail.js';
 import LoginPage from './LoginPage.js';
+import ConsentPage from './ConsentPage.js';
 import FrontPageLoggedOut from './FrontPageLoggedOut.js';
 import {CardSearch} from './CardSearch.js';
 import {BACKEND_HOSTNAME, API_TYPES_REQUEST, API_TYPES_RESPONSE} from './Constants.js';
@@ -37,6 +38,7 @@ class MTGOrganizer extends React.Component {
     };
 
     this.loginPage = React.createRef();
+    this.consentPage = React.createRef();
     this.cardSearch = React.createRef();
     this.cardDetail = React.createRef();
 
@@ -73,6 +75,10 @@ class MTGOrganizer extends React.Component {
     } else if (response.type === this.state.apiTypesMap.LoginChallengeResponse) {
       console.log('In main app, received ' + response.value);
       this.loginPage.current.receiveLoginChallengeResult(response.value);
+    } else if (response.type === this.state.apiTypesMap.LoginResponse) {
+      this.loginPage.current.receiveLoginResponse(response.value);
+    } else if (response.type === this.state.apiTypesMap.ConsentResponse) {
+      this.consentPage.current.receiveConsentResponse(response.value);
     }
   }
 
@@ -86,12 +92,15 @@ class MTGOrganizer extends React.Component {
         <Switch>
           <Route path="/auth/login">
             <LoginPage
-              wrappedComponentRef={this.loginPage}
+              ref={this.loginPage}
               backendRequest={this.backendRequest}
               apiTypesMap={this.state.apiTypesMap} />
           </Route>
           <Route path="/auth/consent">
-            <h2>Consent Page</h2>
+            <ConsentPage
+              ref={this.consentPage}
+              backendRequest={this.backendRequest}
+              apiTypesMap={this.state.apiTypesMap} />
           </Route>
           <Route path="/">
             <FrontPageLoggedOut />

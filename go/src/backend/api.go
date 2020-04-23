@@ -1,5 +1,7 @@
 package backend
 
+import "encoding/json"
+
 type RequestType int
 type ResponseType int
 //go:generate stringer -type=RequestType
@@ -8,6 +10,7 @@ type ResponseType int
 const (
     ApiTypesRequest RequestType = iota
     LoginChallengeCheck
+    ConsentChallengeCheck
     LoginRequest
     CardSearchRequest
     CardDetailRequest
@@ -17,6 +20,8 @@ const (
     ApiTypesResponse ResponseType = iota
     ErrorResponse
     LoginChallengeResponse
+    LoginResponse
+    ConsentResponse
     CardSearchResponse
     CardDetailResponse
 )
@@ -24,6 +29,7 @@ const (
 var requestTypes  = [...]RequestType{
     ApiTypesRequest,
     LoginChallengeCheck,
+    ConsentChallengeCheck,
     LoginRequest,
     CardSearchRequest,
     CardDetailRequest}
@@ -32,12 +38,14 @@ var responseTypes = [...]ResponseType{
     ApiTypesResponse,
     ErrorResponse,
     LoginChallengeResponse,
+    LoginResponse,
+    ConsentResponse,
     CardSearchResponse,
     CardDetailResponse}
 
 type RequestMessage struct {
     Type RequestType `json:"type"`
-    Value string `json:"value"`
+    Value json.RawMessage `json:"value"`
 }
 
 type ResponseMessage struct {

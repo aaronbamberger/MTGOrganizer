@@ -3,16 +3,32 @@ package backend
 import "net/http"
 import "io/ioutil"
 import "encoding/json"
+import "fmt"
 import "log"
 import "database/sql"
 import _ "github.com/go-sql-driver/mysql"
 import "github.com/gorilla/websocket"
+
+const (
+    DB_HOST = "172.18.0.7"
+    CARD_DB = "mtg_cards"
+    USER_DB = "users"
+    APP_DB_USER = "app_user"
+    APP_DB_PW = "app_db_password"
+    LOGIN_DB_USER = "login_user"
+    LOGIN_DB_PW = "login_user_password"
+)
 
 func checkOrigin(req *http.Request) bool {
     origin := req.Header["Origin"]
     log.Printf("Websocket connection from origin: %s\n", origin)
 
     return true
+}
+
+func dbConnStr(user string, pw string, db string) string {
+    return fmt.Sprintf("%s:%s@tcp(%s)/%s?parseTime=true",
+            user, pw, DB_HOST, db)
 }
 
 func HandleApi(resp http.ResponseWriter, req *http.Request) {
@@ -30,8 +46,7 @@ func HandleApi(resp http.ResponseWriter, req *http.Request) {
         req.RemoteAddr)
 
     // Connect to the mariadb database
-    cardDB, err := sql.Open("mysql",
-        "app_user:app_db_password@tcp(172.18.0.5)/mtg_cards?parseTime=true")
+    cardDB, err := sql.Open("mysql", dbConnStr(APP_DB_USER, APP_DB_PW, CARD_DB))
 	if err != nil {
 		log.Print(err)
         return
@@ -73,11 +88,15 @@ func HandleApi(resp http.ResponseWriter, req *http.Request) {
                 case ApiTypesRequest:
                     go apiTypes(doneChan, respChan)
                 case LoginChallengeCheck:
-                    go checkLoginChallenge(message.Value, doneChan, respChan)
+                    go checkLoginChallenge(string(message.Value), doneChan, respChan)
                 case CardSearchRequest:
-                    go cardSearch(cardDB, message.Value, doneChan, respChan)
+                    go cardSearch(cardDB, string(message.Value), doneChan, respChan)
                 case CardDetailRequest:
-                    go cardDetail(cardDB, message.Value, doneChan, respChan)
+                    go cardDetail(cardDB, string(message.Value), doneChan, respChan)
+                case LoginRequest:
+                    go checkUserLogin(string(message.Value), doneChan, respChan)
+                case ConsentChallengeCheck:
+                    go checkUserConsent(string(message.Value), doneChan, respChan)
                 }
 
             default:

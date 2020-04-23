@@ -1,35 +1,27 @@
 import React from 'react';
 import Oidc from 'oidc-client';
-import {withRouter} from 'react-router-dom';
 
 class LoginPage extends React.Component {
   constructor(props) {
     super(props);
 
+    let urlParams = new URLSearchParams(window.location.search);
+
+    console.log(urlParams.get('login_challenge'));
+
     this.state = {
       login_needed: false,
       username: '',
       password: '',
+      login_challenge: urlParams.get('login_challenge'),
       user: null,
     }
 
-    this.authConfig = {
-      authority: 'http://192.168.50.185/',
-      client_id: 'ArcaneBinders',
-      response_type: 'id_token token',
-      redirect_uri: 'http://192.168.50.185:3000/',
-    }
-
     this.receiveLoginChallengeResult = this.receiveLoginChallengeResult.bind(this);
+    this.receiveLoginResponse = this.receiveLoginResponse.bind(this);
     this.handleUsername = this.handleUsername.bind(this);
     this.handlePassword = this.handlePassword.bind(this);
     this.handleLogin = this.handleLogin.bind(this);
-
-    let urlParams = new URLSearchParams(window.location.search);
-
-    this.login_challenge = urlParams.get('login_challenge');
-
-    this.userManager = new Oidc.UserManager(this.authConfig);
   }
 
   componentDidMount() {
@@ -39,7 +31,19 @@ class LoginPage extends React.Component {
   sendLoginChallengeRequest() {
     const request = JSON.stringify({
       "type": this.props.apiTypesMap.LoginChallengeCheck,
-      "value": this.login_challenge,
+      "value": this.state.login_challenge,
+    });
+    this.props.backendRequest(request);
+  }
+
+  sendLoginCredentials() {
+    const request = JSON.stringify({
+      "type": this.props.apiTypesMap.LoginRequest,
+      "value": {
+        "username": this.state.username,
+        "password": this.state.password,
+        "login_challenge": this.state.login_challenge,
+      }
     });
     this.props.backendRequest(request);
   }
@@ -51,6 +55,12 @@ class LoginPage extends React.Component {
     }
   }
 
+  receiveLoginResponse(response) {
+    console.log('Login response: ' + response);
+    let responseJSON = JSON.parse(response);
+    window.location.replace(responseJSON['redirect_to']);
+  }
+
   handleUsername(event) {
     this.setState({username: event.target.value});
   }
@@ -60,9 +70,7 @@ class LoginPage extends React.Component {
   }
 
   handleLogin(event) {
-    console.log('Username: ' + this.state.username);
-    console.log('Password: ' + this.state.password);
-    this.userManager.signinRedirect({state: 'test'});
+    this.sendLoginCredentials()
     event.preventDefault();
   }
 
@@ -93,4 +101,4 @@ class LoginPage extends React.Component {
   }
 }
 
-export default withRouter(LoginPage);
+export default LoginPage;

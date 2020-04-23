@@ -9,7 +9,6 @@ class FrontPageLoggedOut extends React.Component {
       authority: 'http://192.168.50.185/',
       client_id: 'ArcaneBinders',
       redirect_uri: 'http://192.168.50.185:3000/auth_callback',
-
     }
 
     this.handleLogin = this.handleLogin.bind(this);

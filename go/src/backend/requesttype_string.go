@@ -10,14 +10,15 @@ func _() {
 	var x [1]struct{}
 	_ = x[ApiTypesRequest-0]
 	_ = x[LoginChallengeCheck-1]
-	_ = x[LoginRequest-2]
-	_ = x[CardSearchRequest-3]
-	_ = x[CardDetailRequest-4]
+	_ = x[ConsentChallengeCheck-2]
+	_ = x[LoginRequest-3]
+	_ = x[CardSearchRequest-4]
+	_ = x[CardDetailRequest-5]
 }
 
-const _RequestType_name = "ApiTypesRequestLoginChallengeCheckLoginRequestCardSearchRequestCardDetailRequest"
+const _RequestType_name = "ApiTypesRequestLoginChallengeCheckConsentChallengeCheckLoginRequestCardSearchRequestCardDetailRequest"
 
-var _RequestType_index = [...]uint8{0, 15, 34, 46, 63, 80}
+var _RequestType_index = [...]uint8{0, 15, 34, 55, 67, 84, 101}
 
 func (i RequestType) String() string {
 	if i < 0 || i >= RequestType(len(_RequestType_index)-1) {
