@@ -4,11 +4,13 @@ import {
   Switch,
   Route
 } from 'react-router-dom';
+import Oidc from 'oidc-client';
 import './App.css';
 import CardDetail from './CardDetail.js';
 import LoginPage from './LoginPage.js';
 import ConsentPage from './ConsentPage.js';
 import FrontPageLoggedOut from './FrontPageLoggedOut.js';
+import AuthCallbackHandler from './AuthCallbackHandler.js';
 import {CardSearch} from './CardSearch.js';
 import {BACKEND_HOSTNAME, API_TYPES_REQUEST, API_TYPES_RESPONSE} from './Constants.js';
 
@@ -26,23 +28,42 @@ class MTGOrganizer extends React.Component {
   constructor(props) {
     super(props);
 
-    this.backendSocket = new WebSocket('ws://' + BACKEND_HOSTNAME + ':8085/api');
-    this.backendSocket.addEventListener('open', this.handleWebsocketOpen.bind(this));
-    this.backendSocket.addEventListener('message', this.handleWebsocketMessage.bind(this));
+    //this.backendSocket = new WebSocket('ws://' + BACKEND_HOSTNAME + '/backend/api');
+    //this.backendSocket.addEventListener('open', this.handleWebsocketOpen.bind(this));
+    //this.backendSocket.addEventListener('message', this.handleWebsocketMessage.bind(this));
+
+    this.authConfig = {
+      authority: 'http://192.168.50.185/',
+      client_id: 'ArcaneBinders',
+      redirect_uri: 'http://192.168.50.185/auth_callback/',
+      response_mode: 'query',
+    }
+
+    this.userManager = new Oidc.UserManager(this.authConfig);
 
     this.state = {
       loggedIn: false,
+      user: null,
+      backendSocket: null,
       socketConnected: false,
       apiTypesReceived: false,
       apiTypesMap: {}
     };
 
     this.loginPage = React.createRef();
-    this.consentPage = React.createRef();
     this.cardSearch = React.createRef();
     this.cardDetail = React.createRef();
 
     this.backendRequest = this.backendRequest.bind(this);
+  }
+
+  componentDidMount() {
+    this.userManager.getUser().then((user) => {
+      if(user) {
+        console.log(user);
+        this.setState({loggedIn: true, user: user});
+      }
+    });
   }
 
   backendRequest(request) {
@@ -83,27 +104,22 @@ class MTGOrganizer extends React.Component {
   }
 
   render() {
-    if (!this.state.apiTypesReceived) {
-      return (
-        <h2>Loading...</h2>
-      );
-    } else if (!this.state.loggedIn) {
+    if (!this.state.loggedIn) {
       return (
         <Switch>
           <Route path="/auth/login">
-            <LoginPage
-              ref={this.loginPage}
-              backendRequest={this.backendRequest}
-              apiTypesMap={this.state.apiTypesMap} />
+            <LoginPage />
           </Route>
           <Route path="/auth/consent">
-            <ConsentPage
-              ref={this.consentPage}
-              backendRequest={this.backendRequest}
-              apiTypesMap={this.state.apiTypesMap} />
+            <ConsentPage />
+          </Route>
+          <Route path="/auth_callback">
+            <AuthCallbackHandler
+              userManager={this.userManager} />
           </Route>
           <Route path="/">
-            <FrontPageLoggedOut />
+            <FrontPageLoggedOut
+              userManager={this.userManager} />
           </Route>
         </Switch>
       );

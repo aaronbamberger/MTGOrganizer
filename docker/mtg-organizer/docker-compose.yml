@@ -65,11 +65,26 @@ services:
             SECRETS_SYSTEM: "this_is_a_temporary_development_system_secret"
             DSN: "mysql://hydra_user:hydra_password@tcp(card_db)/hydra"
             URLS_SELF_ISSUER: "http://192.168.50.185/"
-            URLS_CONSENT: "http://192.168.50.185:3000/auth/consent"
-            URLS_LOGIN: "http://192.168.50.185:3000/auth/login"
+            URLS_CONSENT: "http://192.168.50.185/auth/consent"
+            URLS_LOGIN: "http://192.168.50.185/auth/login"
             SERVE_PUBLIC_CORS_ENABLED: "true"
-            SERVE_PUBLIC_CORS_ALLOWED_ORIGINS: "[http://192.168.50.185:3000]"
-            SERVE_PUBLIC_CORS_ALLOWED_METHODS: "[POST,GET,PUT,PATCH,DELETE]"
+            SERVE_PUBLIC_CORS_ALLOWED_ORIGINS: "[http://192.168.50.185]"
+            SERVE_PUBLIC_CORS_ALLOWED_METHODS: "[POST,GET,PUT,PATCH,DELETE,OPTIONS]"
             SERVE_PUBLIC_CORS_ALLOWED_HEADERS: "[Authorization]"
             SERVE_PUBLIC_CORS_EXPOSED_HEADERS: "[Content-Type]"
+    frontend-dev:
+        image: "teracy/create-react-app:latest"
+        command: "npm start"
+        volumes:
+            - ../../web_content/front-end:/usr/src
+        working_dir: /usr/src
+    backend-dev:
+        image: "golang:latest"
+        command: sleep infinity
+        environment:
+            GOPATH: "/go"
+        working_dir: "/go/src"
+        volumes:
+            - ../../go/:/go
+
 

@@ -1,5 +1,7 @@
 import React from 'react';
-import Oidc from 'oidc-client';
+import {BACKEND_HOSTNAME,
+        LOGIN_CHALLENGE_ENDPOINT,
+        LOGIN_CREDS_ENDPOINT} from './Constants.js'
 
 class LoginPage extends React.Component {
   constructor(props) {
@@ -17,35 +19,60 @@ class LoginPage extends React.Component {
       user: null,
     }
 
-    this.receiveLoginChallengeResult = this.receiveLoginChallengeResult.bind(this);
-    this.receiveLoginResponse = this.receiveLoginResponse.bind(this);
     this.handleUsername = this.handleUsername.bind(this);
     this.handlePassword = this.handlePassword.bind(this);
     this.handleLogin = this.handleLogin.bind(this);
   }
 
   componentDidMount() {
-    this.sendLoginChallengeRequest()
+    this.sendLoginChallengeRequest();
   }
 
   sendLoginChallengeRequest() {
-    const request = JSON.stringify({
-      "type": this.props.apiTypesMap.LoginChallengeCheck,
-      "value": this.state.login_challenge,
+    const req = new Request("http://" + BACKEND_HOSTNAME + LOGIN_CHALLENGE_ENDPOINT,
+      {
+        method: "POST",
+        body: JSON.stringify({"login_challenge": this.state.login_challenge}),
+      }
+    );
+    fetch(req).then(response => {
+      if (response.redirected) {
+        window.location.href = response.url
+      } else {
+        response.json().then(body => {
+          if (body["display_login_ui"]) {
+            this.setState({login_needed: true});
+          }
+        });
+      }
     });
-    this.props.backendRequest(request);
   }
 
   sendLoginCredentials() {
-    const request = JSON.stringify({
-      "type": this.props.apiTypesMap.LoginRequest,
-      "value": {
-        "username": this.state.username,
-        "password": this.state.password,
-        "login_challenge": this.state.login_challenge,
+    const req = new Request("http://" + BACKEND_HOSTNAME + LOGIN_CREDS_ENDPOINT,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          "username": this.state.username,
+          "password": this.state.password,
+          "login_challenge": this.state.login_challenge,
+          }),
+        redirect: "follow",
+        mode: "cors",
+      }
+    );
+    fetch(req).then(response => {
+      console.log(response);
+      if (response.redirected) {
+        console.log(response.url);
+        for (const header of response.headers) {
+          console.log(header);
+          //console.log(header + ": " + response.headers.get(header));
+        }
+        //console.log(response.headers);
+        window.location.href = response.url;
       }
     });
-    this.props.backendRequest(request);
   }
 
   receiveLoginChallengeResult(result) {
@@ -75,6 +102,7 @@ class LoginPage extends React.Component {
   }
 
   render() {
+    console.log(this.state);
     if (!this.state.login_needed) {
       return '';
     } else {
