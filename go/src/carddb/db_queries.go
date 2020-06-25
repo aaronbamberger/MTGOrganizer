@@ -192,12 +192,12 @@ func (queries *DBInsertQueries) Prepare(db *sql.DB) error {
 	}
 
     queries.InsertCardQuery, err = db.Prepare(`INSERT INTO all_cards
-		(uuid, card_hash, artist, border_color, card_number, card_power,
+		(uuid, card_hash, artist, ascii_name, border_color, card_number, card_power,
         card_type, color_identity, color_indicator, colors, converted_mana_cost,
-        duel_deck, edhrec_rank, face_converted_mana_cost, flavor_text,
+        duel_deck, edhrec_rank, face_converted_mana_cost, flavor_name, flavor_text,
         frame_version, hand, has_foil, has_non_foil, is_alternative,
-        is_arena, is_full_art, is_mtgo, is_online_only, is_oversized,
-        is_paper, is_promo, is_reprint, is_reserved, is_starter,
+        is_arena, is_buy_a_box, is_date_stamped, is_full_art, is_mtgo, is_online_only,
+        is_oversized, is_paper, is_promo, is_reprint, is_reserved, is_starter,
         is_story_spotlight, is_textless, is_timeshifted, layout, life, loyalty,
         mana_cost, mcm_id, mcm_meta_id, mtg_arena_id, mtgo_foil_id, mtgo_id,
         mtgstocks_id, multiverse_id, name, original_text, original_type, rarity,
@@ -206,7 +206,7 @@ func (queries *DBInsertQueries) Prepare(db *sql.DB) error {
 		VALUES
 		(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
 		?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-        ?, ?, ?, ?, ?, ?, ?)`)
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		return err
 	}
@@ -469,6 +469,7 @@ func (queries *DBUpdateQueries) Prepare(db *sql.DB) error {
 	queries.UpdateCardQuery, err = db.Prepare(`UPDATE all_cards SET
         card_hash = ?,
         artist = ?,
+        ascii_name = ?,
         border_color = ?,
         card_number = ?,
         card_power = ?,
@@ -480,6 +481,7 @@ func (queries *DBUpdateQueries) Prepare(db *sql.DB) error {
         duel_deck = ?,
         edhrec_rank = ?,
         face_converted_mana_cost = ?,
+        flavor_name = ?,
         flavor_text = ?,
         frame_version = ?,
         hand = ?,
@@ -487,6 +489,8 @@ func (queries *DBUpdateQueries) Prepare(db *sql.DB) error {
         has_non_foil = ?,
         is_alternative = ?,
         is_arena = ?,
+        is_buy_a_box = ?,
+        is_date_stamped = ?,
         is_full_art = ?,
         is_mtgo = ?,
         is_online_only = ?,

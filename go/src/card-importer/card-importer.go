@@ -169,7 +169,7 @@ func UpdateCards(cardDB *sql.DB, priceAndStatsDB influx.Client) (time.Duration, 
     log.Printf("Cards are out of date, updating...\n")
 
     log.Printf("Downloading new cards...\n")
-    allSets, err := mtgcards.DownloadAllPrintings(false)
+    allSets, err := mtgcards.DownloadAllPrintings(false, false)
     if err != nil {
         return updateDuration, err
     }

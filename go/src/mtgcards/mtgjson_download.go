@@ -24,11 +24,13 @@ const (
 
 const (
     downloadLocation = "/var/card-importer/card-data/"
+    debugDownloadLocation = "./"
 )
 
-func DownloadAllPrintings(useCachedIfAvailable bool) (map[string]MTGSet, error) {
+func DownloadAllPrintings(useCachedIfAvailable bool, useDebugDownloadLocation bool) (map[string]MTGSet, error) {
     result, err := downloadData(
         useCachedIfAvailable,
+        useDebugDownloadLocation,
         allPrintingsUrl,
         decodeSets)
     if err != nil {
@@ -69,6 +71,7 @@ func DebugParseAllPrintingsGz(filename string) (map[string]MTGSet, error) {
 func DownloadAllPrices(useCachedIfAvailable bool) (map[string]MTGCardPrices, error) {
     result, err := downloadData(
         useCachedIfAvailable,
+        false,
         allPricesUrl,
         decodePrices)
     if err != nil {
@@ -84,6 +87,7 @@ func DownloadAllPrices(useCachedIfAvailable bool) (map[string]MTGCardPrices, err
 
 func DownloadVersion() (MTGJSONVersion, error) {
     result, err := downloadData(
+        false,
         false,
         versionUrl,
         decodeVersion)
@@ -127,21 +131,22 @@ func decodeVersion(input io.Reader) (interface{}, error) {
 
 func downloadData(
         useCachedIfAvailable bool,
+        useDebugDownloadLocation bool,
         fileUrl string,
         decoderFn func(io.Reader) (interface{}, error)) (interface{}, error) {
-    result, err := tryGz(useCachedIfAvailable, fileUrl, decoderFn)
+    result, err := tryGz(useCachedIfAvailable, useDebugDownloadLocation, fileUrl, decoderFn)
     if err == nil {
         return result, nil
     }
     log.Print(err)
 
-    result, err = tryBz2(useCachedIfAvailable, fileUrl, decoderFn)
+    result, err = tryBz2(useCachedIfAvailable, useDebugDownloadLocation, fileUrl, decoderFn)
     if err == nil {
         return result, nil
     }
     log.Print(err)
 
-    result, err = tryRaw(useCachedIfAvailable, fileUrl, decoderFn)
+    result, err = tryRaw(useCachedIfAvailable, useDebugDownloadLocation, fileUrl, decoderFn)
     if err == nil {
         return result, nil
     }
@@ -152,9 +157,10 @@ func downloadData(
 
 func tryGz(
         useCachedIfAvailable bool,
+        useDebugDownloadLocation bool,
         fileUrl string,
         decoderFn func(io.Reader) (interface{}, error)) (interface{}, error) {
-    reader, err := tryDownload(fileUrl + jsonExt + gzExt, useCachedIfAvailable)
+    reader, err := tryDownload(fileUrl + jsonExt + gzExt, useCachedIfAvailable, useDebugDownloadLocation)
     if err != nil {
         return nil, err
     }
@@ -171,9 +177,10 @@ func tryGz(
 
 func tryBz2(
         useCachedIfAvailable bool,
+        useDebugDownloadLocation bool,
         fileUrl string,
         decoderFn func(io.Reader) (interface{}, error)) (interface{}, error) {
-    reader, err := tryDownload(fileUrl + jsonExt + bz2Ext, useCachedIfAvailable)
+    reader, err := tryDownload(fileUrl + jsonExt + bz2Ext, useCachedIfAvailable, useDebugDownloadLocation)
     if err != nil {
         return nil, err
     }
@@ -186,9 +193,10 @@ func tryBz2(
 
 func tryRaw(
         useCachedIfAvailable bool,
+        useDebugDownloadLocation bool,
         fileUrl string,
         decoderFn func(io.Reader) (interface{}, error)) (interface{}, error) {
-    reader, err := tryDownload(fileUrl + jsonExt, useCachedIfAvailable)
+    reader, err := tryDownload(fileUrl + jsonExt, useCachedIfAvailable, useDebugDownloadLocation)
     if err != nil {
         return nil, err
     }
@@ -197,10 +205,15 @@ func tryRaw(
     return decoderFn(reader)
 }
 
-func tryDownload(filename string, useCachedIfAvailable bool) (io.ReadCloser, error) {
+func tryDownload(filename string, useCachedIfAvailable bool, useDebugDownloadLocation bool) (io.ReadCloser, error) {
 	// If we've either been asked to not use a local cached file, or
 	// we have, but the file hasn't been downloaded, download the file
-    fileLocation := downloadLocation + filename
+    var fileLocation string
+    if useDebugDownloadLocation {
+        fileLocation = debugDownloadLocation + filename
+    } else {
+        fileLocation = downloadLocation + filename
+    }
 	_, err := os.Stat(fileLocation)
 	if !useCachedIfAvailable || os.IsNotExist(err) {
 		fullUrl := mtgjsonBaseUrl + filename

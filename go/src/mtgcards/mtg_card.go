@@ -177,6 +177,7 @@ type MTGCard struct {
 	Rulings []MTGCardRuling `json:"rulings"`
 
 	// Optional
+    AsciiName string `json:"asciiName"`
 	EDHRecRank int `json:"edhrecRank"`
 	Hand string `json:"hand"`
 	IsReserved bool `json:"isReserved"`
@@ -202,11 +203,14 @@ type MTGCard struct {
 
 	// Optional
 	DuelDeck string `json:"duelDeck"`
+    FlavorName string `json:"flavorName"`
 	FlavorText string `json:"flavorText"`
 	HasFoil bool `json:"hasFoil"`
 	HasNonFoil bool `json:"hasNonFoil"`
 	IsAlternative bool `json:"isAlternative"`
 	IsArena bool `json:"isArena"`
+    IsBuyABox bool `json:"isBuyABox"`
+    IsDateStamped bool `json:"isDateStamped"`
 	IsFullArt bool `json:"isFullArt"`
 	IsMTGO bool `json:"isMtgo"`
 	IsOnlineOnly bool `json:"isOnlineOnly"`
@@ -324,6 +328,7 @@ func (card *MTGCard) Hash() string {
             ruling := &card.Rulings[idx]
             hash.Write([]byte(ruling.Hash()))
 		}
+        hash.Write([]byte(card.AsciiName))
 		binary.Write(hash, binary.BigEndian, card.EDHRecRank)
 		hash.Write([]byte(card.Hand))
 		binary.Write(hash, binary.BigEndian, card.IsReserved)
@@ -361,11 +366,14 @@ func (card *MTGCard) Hash() string {
 			hash.Write([]byte(variation))
 		}
 		hash.Write([]byte(card.DuelDeck))
+        hash.Write([]byte(card.FlavorName))
 		hash.Write([]byte(card.FlavorText))
 		binary.Write(hash, binary.BigEndian, card.HasFoil)
 		binary.Write(hash, binary.BigEndian, card.HasNonFoil)
 		binary.Write(hash, binary.BigEndian, card.IsAlternative)
 		binary.Write(hash, binary.BigEndian, card.IsArena)
+        binary.Write(hash, binary.BigEndian, card.IsBuyABox)
+        binary.Write(hash, binary.BigEndian, card.IsDateStamped)
 		binary.Write(hash, binary.BigEndian, card.IsFullArt)
 		binary.Write(hash, binary.BigEndian, card.IsMTGO)
 		binary.Write(hash, binary.BigEndian, card.IsOnlineOnly)

@@ -29,11 +29,13 @@ func InsertCardToDB(
         setId int64,
         queries *DBInsertQueries) error {
 	// Build all of the values that can be null
+    var asciiName sql.NullString
     var colorIdentity sql.NullString
 	var colorIndicator sql.NullString
 	var colors sql.NullString
     var duelDeck sql.NullString
 	var edhrecRank sql.NullInt32
+    var flavorName sql.NullString
 	var flavorText sql.NullString
 	var hand sql.NullString
     var life sql.NullString
@@ -44,6 +46,11 @@ func InsertCardToDB(
     var name sql.NullString
 	var scryfallIllustrationId sql.NullString
 	var side sql.NullString
+
+    if len(card.AsciiName) > 0 {
+        asciiName.String = card.AsciiName
+        asciiName.Valid = true
+    }
 
 	if len(card.ColorIdentity) > 0 {
 		colorIdentity.String = strings.Join(card.ColorIdentity, ",")
@@ -69,6 +76,11 @@ func InsertCardToDB(
 		edhrecRank.Int32 = int32(card.EDHRecRank)
 		edhrecRank.Valid = true
 	}
+
+    if len(card.FlavorName) > 0 {
+        flavorName.String = card.FlavorName
+        flavorName.Valid = true
+    }
 
     if len(card.FlavorText) > 0 {
 		flavorText.String = card.FlavorText
@@ -124,6 +136,7 @@ func InsertCardToDB(
         card.UUID,
         card.Hash(),
         card.Artist,
+        asciiName,
         card.BorderColor,
         card.Number,
         card.Power,
@@ -135,6 +148,7 @@ func InsertCardToDB(
         duelDeck,
 		edhrecRank,
 		card.FaceConvertedManaCost,
+        flavorName,
         flavorText,
         card.FrameVersion,
 		hand,
@@ -142,6 +156,8 @@ func InsertCardToDB(
         card.HasNonFoil,
         card.IsAlternative,
         card.IsArena,
+        card.IsBuyABox,
+        card.IsDateStamped,
         card.IsFullArt,
         card.IsMTGO,
         card.IsOnlineOnly,
@@ -205,11 +221,13 @@ func UpdateCardInDB(
         deleteQueries *DBDeleteQueries,
         insertQueries *DBInsertQueries) error {
     // Build all of the values that can be null
+    var asciiName sql.NullString
     var colorIdentity sql.NullString
 	var colorIndicator sql.NullString
 	var colors sql.NullString
     var duelDeck sql.NullString
 	var edhrecRank sql.NullInt32
+    var flavorName sql.NullString
 	var flavorText sql.NullString
 	var hand sql.NullString
     var life sql.NullString
@@ -220,6 +238,11 @@ func UpdateCardInDB(
     var name sql.NullString
 	var scryfallIllustrationId sql.NullString
 	var side sql.NullString
+
+    if len(card.AsciiName) > 0 {
+        asciiName.String = card.AsciiName
+        asciiName.Valid = true
+    }
 
 	if len(card.ColorIdentity) > 0 {
 		colorIdentity.String = strings.Join(card.ColorIdentity, ",")
@@ -245,6 +268,11 @@ func UpdateCardInDB(
 		edhrecRank.Int32 = int32(card.EDHRecRank)
 		edhrecRank.Valid = true
 	}
+
+    if len(card.FlavorName) > 0 {
+        flavorName.String = card.FlavorName
+        flavorName.Valid = true
+    }
 
     if len(card.FlavorText) > 0 {
 		flavorText.String = card.FlavorText
@@ -300,6 +328,7 @@ func UpdateCardInDB(
 	_, err := updateQueries.UpdateCardQuery.Exec(
         card.Hash(),
         card.Artist,
+        asciiName,
         card.BorderColor,
         card.Number,
         card.Power,
@@ -311,6 +340,7 @@ func UpdateCardInDB(
         duelDeck,
 		edhrecRank,
 		card.FaceConvertedManaCost,
+        flavorName,
         flavorText,
         card.FrameVersion,
 		hand,
@@ -318,6 +348,8 @@ func UpdateCardInDB(
         card.HasNonFoil,
         card.IsAlternative,
         card.IsArena,
+        card.IsBuyABox,
+        card.IsDateStamped,
         card.IsFullArt,
         card.IsMTGO,
         card.IsOnlineOnly,

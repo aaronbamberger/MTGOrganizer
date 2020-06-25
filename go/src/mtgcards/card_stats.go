@@ -65,8 +65,10 @@ func DevelopmentStats(sets map[string]MTGSet) {
 	maxSetTypeLen := 0
 
 	maxArtistLen := 0
+    maxAsciiNameLen := 0
 	maxBorderColorLen := 0
 	maxDuelDeckLen := 0
+    maxFlavorNameLen := 0
 	maxFlavorTextLen := 0
 	maxAltLangFlavorTextLen := 0
 	maxAltLangLanguageLen := 0
@@ -182,12 +184,18 @@ func DevelopmentStats(sets map[string]MTGSet) {
 			if len(card.Artist) > maxArtistLen {
 				maxArtistLen = len(card.Artist)
 			}
+            if len(card.AsciiName) > maxAsciiNameLen {
+                maxAsciiNameLen = len(card.AsciiName)
+            }
 			if len(card.BorderColor) > maxBorderColorLen {
 				maxBorderColorLen = len(card.BorderColor)
 			}
 			if len(card.DuelDeck) > maxDuelDeckLen {
 				maxDuelDeckLen = len(card.DuelDeck)
 			}
+            if len(card.FlavorName) > maxFlavorNameLen {
+                maxFlavorNameLen = len(card.FlavorName)
+            }
 			if len(card.FlavorText) > maxFlavorTextLen {
 				maxFlavorTextLen = len(card.FlavorText)
 			}
@@ -346,8 +354,10 @@ func DevelopmentStats(sets map[string]MTGSet) {
 	fmt.Printf("Max set type len: %d\n", maxSetTypeLen)
 
 	fmt.Printf("Max artist len: %d\n", maxArtistLen)
+    fmt.Printf("Max ascii name len: %d\n", maxAsciiNameLen)
 	fmt.Printf("Max border color len: %d\n", maxBorderColorLen)
 	fmt.Printf("Max duel deck len: %d\n", maxDuelDeckLen)
+    fmt.Printf("Max flavor name len: %d\n", maxFlavorNameLen)
 	fmt.Printf("Max flavor text len: %d\n", maxFlavorTextLen)
 	fmt.Printf("Max alt lang flavor text len: %d\n", maxAltLangFlavorTextLen)
 	fmt.Printf("Max alt lang language len: %d\n", maxAltLangLanguageLen)

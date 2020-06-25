@@ -5,6 +5,7 @@ CREATE TABLE mtg_cards.all_cards (
 	uuid CHAR(36) NOT NULL,
 	card_hash CHAR(32) NOT NULL,
 	artist VARCHAR(100) NOT NULL COLLATE utf8mb4_general_ci, #Max existing len: 54
+	ascii_name VARCHAR(150) NULL COLLATE utf8mb4_general_ci, #Max existing len: 63
 	border_color VARCHAR(30) NOT NULL COLLATE utf8mb4_general_ci, #Max existing len: 10
 	card_number VARCHAR(20) NOT NULL COLLATE utf8mb4_general_ci, #Max existing len: 9
 	card_power VARCHAR(10) NOT NULL COLLATE utf8mb4_general_ci, #Max existing len: 3
@@ -16,6 +17,7 @@ CREATE TABLE mtg_cards.all_cards (
 	duel_deck CHAR(1) NULL COLLATE utf8mb4_general_ci,
 	edhrec_rank INTEGER NULL,
 	face_converted_mana_cost FLOAT NOT NULL,
+	flavor_name VARCHAR(100) NULL COLLAGE utf8mb4_general_ci, #Max existing len: 30
 	flavor_text VARCHAR(2000) NULL COLLATE utf8mb4_general_ci, #Max existing len: 1000
 	frame_version VARCHAR(20) NOT NULL COLLATE utf8mb4_general_ci, #Max existing len: 6
 	hand VARCHAR(10) NULL COLLATE utf8mb4_general_ci, #Max existing len: 2
@@ -23,6 +25,8 @@ CREATE TABLE mtg_cards.all_cards (
 	has_non_foil BOOLEAN NOT NULL DEFAULT FALSE,
 	is_alternative BOOLEAN NOT NULL DEFAULT FALSE,
 	is_arena BOOLEAN NOT NULL DEFAULT FALSE,
+	is_buy_a_box BOOLEAN NOT NULL DEFAULT FALSE,
+	is_date_stamped BOOLEAN NOT NULL DEFAULT FALSE,
 	is_full_art BOOLEAN NOT NULL DEFAULT FALSE,
 	is_mtgo BOOLEAN NOT NULL DEFAULT FALSE,
 	is_online_only BOOLEAN NOT NULL DEFAULT FALSE,
