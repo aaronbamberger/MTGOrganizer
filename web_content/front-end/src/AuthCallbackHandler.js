@@ -1,4 +1,5 @@
 import React from 'react';
+import {withRouter} from 'react-router-dom';
 
 class AuthCallbackHandler extends React.Component {
   constructor(props) {
@@ -18,9 +19,12 @@ class AuthCallbackHandler extends React.Component {
         errorType: callbackResults.get("error"),
         errorMessage: callbackResults.get("error_description"),
       });
+      this.props.history.replace("/auth_callback");
     } else {
       this.props.userManager.signinRedirectCallback().then((user) => {
+        console.log("Completed auth callback");
         console.log(user);
+        this.props.history.replace("/auth_callback");
       });
       this.setState({
         loginSuccessful: true,
@@ -47,4 +51,4 @@ class AuthCallbackHandler extends React.Component {
   }
 }
 
-export default AuthCallbackHandler;
+export default withRouter(AuthCallbackHandler);

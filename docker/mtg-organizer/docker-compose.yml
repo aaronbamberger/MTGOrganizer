@@ -60,7 +60,7 @@ services:
             - "80:80"
     hydra:
         image: "oryd/hydra:latest"
-        command: serve all --dangerous-force-http
+        command: serve all --dangerous-force-http --dangerous-allow-insecure-redirect-urls "http://192.168.50.185/auth_callback/"
         environment:
             SECRETS_SYSTEM: "this_is_a_temporary_development_system_secret"
             DSN: "mysql://hydra_user:hydra_password@tcp(card_db)/hydra"
@@ -72,6 +72,7 @@ services:
             SERVE_PUBLIC_CORS_ALLOWED_METHODS: "[POST,GET,PUT,PATCH,DELETE,OPTIONS]"
             SERVE_PUBLIC_CORS_ALLOWED_HEADERS: "[Authorization]"
             SERVE_PUBLIC_CORS_EXPOSED_HEADERS: "[Content-Type]"
+            OAUTH2_PKCE_ENFORCED_FOR_PUBLIC_CLIENTS: "true"
     frontend-dev:
         image: "teracy/create-react-app:latest"
         command: "npm start"

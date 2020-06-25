@@ -9,6 +9,7 @@ import "strings"
 import "mtgcards"
 
 func sendError(done <-chan interface{}, respChan chan<- ResponseMessage, err error) {
+    log.Print(err)
     select {
     case <-done:
     case respChan <- ResponseMessage{Type: ErrorResponse, Value: err}:
@@ -34,7 +35,12 @@ func cardSearch(db *sql.DB,
     }
     defer dbConn.Close()
 
+    // * Accept possesives either with or without the apostrophe
+    // * Strip the quotes off of the search name
+    // * Match the name on word boundaries so any part of the name can
+    //   be searched for
     processedName := strings.ReplaceAll(request, "s", "'?s")
+    processedName = strings.ReplaceAll(processedName, "\"", "")
     res, err := dbConn.QueryContext(
         context.Background(),
         `SELECT DISTINCT

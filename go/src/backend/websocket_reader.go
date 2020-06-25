@@ -10,7 +10,7 @@ import _ "github.com/go-sql-driver/mysql"
 import "github.com/gorilla/websocket"
 
 const (
-    DB_HOST = "card_db"
+    DB_HOST = "card_db:3306"
     CARD_DB = "mtg_cards"
     USER_DB = "users"
     APP_DB_USER = "app_user"
@@ -51,6 +51,7 @@ func HandleApi(resp http.ResponseWriter, req *http.Request) {
 		log.Print(err)
         return
 	}
+
 	defer cardDB.Close()
 	cardDB.SetMaxIdleConns(10)
 
@@ -87,16 +88,10 @@ func HandleApi(resp http.ResponseWriter, req *http.Request) {
                 switch message.Type {
                 case ApiTypesRequest:
                     go apiTypes(doneChan, respChan)
-                //case LoginChallengeCheck:
-                //    go checkLoginChallenge(string(message.Value), doneChan, respChan)
                 case CardSearchRequest:
                     go cardSearch(cardDB, string(message.Value), doneChan, respChan)
                 case CardDetailRequest:
                     go cardDetail(cardDB, string(message.Value), doneChan, respChan)
-                //case LoginRequest:
-                //    go checkUserLogin(string(message.Value), doneChan, respChan)
-                //case ConsentChallengeCheck:
-                //    go checkUserConsent(string(message.Value), doneChan, respChan)
                 }
 
             default:
