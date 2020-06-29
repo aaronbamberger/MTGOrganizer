@@ -8,12 +8,12 @@ import "unicode"
 import "unicode/utf8"
 
 func loadTestCardData() (map[string]MTGSet, error) {
-    testCardDataRaw, err := tryRaw(true, true, "TestCardData", decodeSets)
+    testCardDataGz, err := tryGz(true, true, "TestCardData", decodeSets)
     if err != nil {
         return nil, err
     }
 
-    testCardData, ok := testCardDataRaw.(map[string]MTGSet)
+    testCardData, ok := testCardDataGz.(map[string]MTGSet)
     if !ok {
         return nil, fmt.Errorf("Unable to parse test card data JSON to correct type")
     }
