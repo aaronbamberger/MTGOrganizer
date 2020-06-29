@@ -26,9 +26,6 @@ type MTGSet struct {
     Tokens []MTGToken `json:"tokens"`
 	Translations map[string]string `json:"translations"`
 	Type string `json:"type"`
-
-	hash string
-	hashValid bool
 }
 
 func (set *MTGSet) Diff(other *MTGSet) string {
@@ -91,59 +88,6 @@ func (set MTGSet) String() string {
 
 func (set *MTGSet) Hash() string {
     return objectHash(*set)
-    /*
-	if !set.hashValid {
-        hash := fnv.New128a()
-		binary.Write(hash, binary.BigEndian, set.BaseSetSize)
-		hash.Write([]byte(set.Block))
-
-        // Cards
-		for idx := range set.Cards {
-            card := &set.Cards[idx]
-            hash.Write([]byte(card.Hash()))
-		}
-
-        // Tokens
-        for idx := range set.Tokens {
-            token := &set.Tokens[idx]
-            hash.Write([]byte(token.Hash()))
-        }
-
-		hash.Write([]byte(set.Code))
-		binary.Write(hash, binary.BigEndian, set.IsForeignOnly)
-		binary.Write(hash, binary.BigEndian, set.IsFoilOnly)
-		binary.Write(hash, binary.BigEndian, set.IsOnlineOnly)
-		binary.Write(hash, binary.BigEndian, set.IsPartialPreview)
-		hash.Write([]byte(set.KeyruneCode))
-		hash.Write([]byte(set.MCMName))
-		binary.Write(hash, binary.BigEndian, set.MCMId)
-		hash.Write([]byte(set.MTGOCode))
-		hash.Write([]byte(set.Name))
-		hash.Write([]byte(set.ParentCode))
-		hash.Write([]byte(set.ReleaseDate))
-		binary.Write(hash, binary.BigEndian, set.TCGPlayerGroupId)
-		binary.Write(hash, binary.BigEndian, set.TotalSetSize)
-		// Since go maps don't have a defined iteration order,
-		// Ensure a repeatable hash by sorting the keyset, and using
-		// that to define the iteration order
-		translationLangs := make([]string, 0, len(set.Translations))
-		for lang, _ := range set.Translations {
-			translationLangs = append(translationLangs, lang)
-		}
-		sort.Strings(translationLangs)
-		for _, lang := range translationLangs {
-			hash.Write([]byte(lang))
-			hash.Write([]byte(set.Translations[lang]))
-		}
-		hash.Write([]byte(set.Type))
-
-        set.hash = hashToHexString(hash)
-
-		set.hashValid = true
-	}
-
-	return set.hash
-    */
 }
 
 func (set *MTGSet) Canonicalize() {

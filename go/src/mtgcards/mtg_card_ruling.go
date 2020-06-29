@@ -6,26 +6,10 @@ import "strings"
 type MTGCardRuling struct {
 	Date string `json:"date"`
 	Text string `json:"text"`
-
-	hash string
-	hashValid bool
 }
 
 func (ruling *MTGCardRuling) Hash() string {
     return objectHash(*ruling)
-    /*
-	if !ruling.hashValid {
-        hash := fnv.New128a()
-
-		hash.Write([]byte(ruling.Date))
-		hash.Write([]byte(ruling.Text))
-
-        ruling.hash = hashToHexString(hash)
-		ruling.hashValid = true
-	}
-
-	return ruling.hash
-    */
 }
 
 func (ruling MTGCardRuling) String() string {

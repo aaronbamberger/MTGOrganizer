@@ -7,30 +7,10 @@ import "strings"
 type MTGToken struct {
 	MTGCardCommon
 	ReverseRelated []string `json:"reverseRelated"`
-
-    hash string
-    hashValid bool
 }
 
 func (token *MTGToken) Hash() string {
     return objectHash(*token)
-    /*
-    if !token.hashValid {
-        hash := fnv.New128a()
-
-        // Start with the hash of the common properties
-        hash.Write([]byte(token.MTGCardCommon.Hash()))
-
-        for _, reverseRelated := range token.ReverseRelated {
-            hash.Write([]byte(reverseRelated))
-        }
-
-        token.hash = hashToHexString(hash)
-        token.hashValid = true
-    }
-
-    return token.hash
-    */
 }
 
 func (token MTGToken) String() string {
