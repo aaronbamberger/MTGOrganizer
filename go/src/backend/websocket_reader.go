@@ -89,9 +89,21 @@ func HandleApi(resp http.ResponseWriter, req *http.Request) {
                 case ApiTypesRequest:
                     go apiTypes(doneChan, respChan)
                 case CardSearchRequest:
-                    go cardSearch(cardDB, string(message.Value), doneChan, respChan)
+                    var searchName string
+                    err = json.Unmarshal([]byte(message.Value), &searchName)
+                    if err != nil {
+                        log.Print(err)
+                        continue
+                    }
+                    go cardSearch(cardDB, searchName, doneChan, respChan)
                 case CardDetailRequest:
-                    go cardDetail(cardDB, string(message.Value), doneChan, respChan)
+                    var cardUUID string
+                    err = json.Unmarshal([]byte(message.Value), &cardUUID)
+                    if err != nil {
+                        log.Print(err)
+                        continue
+                    }
+                    go cardDetail(cardDB, cardUUID, doneChan, respChan)
                 }
 
             default:

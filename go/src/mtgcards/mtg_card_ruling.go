@@ -1,6 +1,7 @@
 package mtgcards
 
-import "hash/fnv"
+import "fmt"
+import "strings"
 
 type MTGCardRuling struct {
 	Date string `json:"date"`
@@ -11,6 +12,8 @@ type MTGCardRuling struct {
 }
 
 func (ruling *MTGCardRuling) Hash() string {
+    return objectHash(*ruling)
+    /*
 	if !ruling.hashValid {
         hash := fnv.New128a()
 
@@ -22,18 +25,32 @@ func (ruling *MTGCardRuling) Hash() string {
 	}
 
 	return ruling.hash
+    */
 }
 
-type ByDate []MTGCardRuling
+func (ruling MTGCardRuling) String() string {
+    var b strings.Builder
 
-func (rulings ByDate) Len() int {
+    fmt.Fprintf(&b, "Date: %s\n", ruling.Date)
+    fmt.Fprintf(&b, "Text: %s\n", ruling.Text)
+
+    return b.String()
+}
+
+type ByDateThenText []MTGCardRuling
+
+func (rulings ByDateThenText) Len() int {
 	return len(rulings)
 }
 
-func (rulings ByDate) Less(i, j int) bool {
-	return rulings[i].Date < rulings[j].Date
+func (rulings ByDateThenText) Less(i, j int) bool {
+    if rulings[i].Date != rulings[j].Date {
+        return rulings[i].Date < rulings[j].Date
+    } else {
+        return rulings[i].Text < rulings[j].Text
+    }
 }
 
-func (rulings ByDate) Swap(i, j int) {
+func (rulings ByDateThenText) Swap(i, j int) {
 	rulings[i], rulings[j] = rulings[j], rulings[i]
 }

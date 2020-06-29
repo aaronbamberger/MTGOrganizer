@@ -1,7 +1,8 @@
 package mtgcards
 
-import "hash/fnv"
+import "fmt"
 import "sort"
+import "strings"
 
 type MTGToken struct {
 	MTGCardCommon
@@ -12,6 +13,8 @@ type MTGToken struct {
 }
 
 func (token *MTGToken) Hash() string {
+    return objectHash(*token)
+    /*
     if !token.hashValid {
         hash := fnv.New128a()
 
@@ -27,6 +30,16 @@ func (token *MTGToken) Hash() string {
     }
 
     return token.hash
+    */
+}
+
+func (token MTGToken) String() string {
+    var b strings.Builder
+
+    fmt.Fprintf(&b, "%s", token.MTGCardCommon)
+    fmt.Fprintf(&b, "Reverse related: %v\n", token.ReverseRelated)
+
+    return b.String()
 }
 
 func (token *MTGToken) Canonicalize() {
@@ -36,16 +49,20 @@ func (token *MTGToken) Canonicalize() {
     sort.Strings(token.ReverseRelated)
 }
 
-type TokenByUUID []MTGToken
+type TokenByUUIDThenSide []MTGToken
 
-func (tokens TokenByUUID) Len() int {
+func (tokens TokenByUUIDThenSide) Len() int {
 	return len(tokens)
 }
 
-func (tokens TokenByUUID) Less(i, j int) bool {
-	return tokens[i].UUID < tokens[j].UUID
+func (tokens TokenByUUIDThenSide) Less(i, j int) bool {
+    if tokens[i].UUID != tokens[j].UUID {
+        return tokens[i].UUID < tokens[j].UUID
+    } else {
+        return tokens[i].Side < tokens[j].Side
+    }
 }
 
-func (tokens TokenByUUID) Swap(i, j int) {
+func (tokens TokenByUUIDThenSide) Swap(i, j int) {
 	tokens[i], tokens[j] = tokens[j], tokens[i]
 }

@@ -1,8 +1,6 @@
 package mtgcards
 
-import "encoding/binary"
 import "fmt"
-import "hash/fnv"
 import "reflect"
 import "sort"
 import "strings"
@@ -49,6 +47,23 @@ type MTGCardCommon struct {
 
     commonHash string
     commonHashValid bool
+}
+
+func (card MTGCardCommon) String() string {
+    var b strings.Builder
+
+    fmt.Fprintf(&b, "Color Identity: %s\n", card.ColorIdentity)
+    fmt.Fprintf(&b, "Colors: %s\n", card.Colors)
+    fmt.Fprintf(&b, "Subtypes: %s\n", card.Subtypes)
+    fmt.Fprintf(&b, "Supertypes: %s\n", card.Supertypes)
+    fmt.Fprintf(&b, "Types: %s\n", card.Types)
+    fmt.Fprintf(&b, "Color Indicator: %s\n", card.ColorIndicator)
+    fmt.Fprintf(&b, "Names: %s\n", card.Names)
+    fmt.Fprintf(&b, "Side: %s\n", card.Side)
+    fmt.Fprintf(&b, "UUID: %s\n", card.UUID)
+    fmt.Fprintf(&b, "Scryfall illustration ID: %s\n", card.ScryfallIllustrationId)
+
+    return b.String()
 }
 
 func (card *MTGCardCommon) Diff(other *MTGCardCommon) string {
@@ -107,6 +122,8 @@ func (card *MTGCardCommon) Canonicalize() {
 }
 
 func (card *MTGCardCommon) Hash() string {
+    return objectHash(*card)
+    /*
 	if !card.commonHashValid {
         hash := fnv.New128a()
 
@@ -157,6 +174,7 @@ func (card *MTGCardCommon) Hash() string {
 	}
 
 	return card.commonHash
+    */
 }
 
 type MTGCard struct {
@@ -231,6 +249,25 @@ type MTGCard struct {
 	hashValid bool
 }
 
+func (card MTGCard) String() string {
+    var b strings.Builder
+
+    fmt.Fprintf(&b, "%s\n", card.Name)
+    fmt.Fprintf(&b, "%s\n", card.MTGCardCommon.String())
+    fmt.Fprintf(&b, "Printings: %s\n", card.Printings)
+    fmt.Fprintf(&b, "Frame effects: %s\n", card.FrameEffects)
+    fmt.Fprintf(&b, "Variations: %s\n", card.Variations)
+    fmt.Fprintf(&b, "Other face IDs: %s\n", card.OtherFaceIds)
+    for i, langInfo := range card.AlternateLanguageData {
+        fmt.Fprintf(&b, "Alt lang info %d:\n%s", i, langInfo)
+    }
+    for i, ruling := range card.Rulings {
+        fmt.Fprintf(&b, "Ruling %d:\n%s", i, ruling)
+    }
+
+    return b.String()
+}
+
 func (card *MTGCard) Diff(other *MTGCard) string {
     var b strings.Builder
 
@@ -279,6 +316,8 @@ func (card *MTGCard) Diff(other *MTGCard) string {
 }
 
 func (card *MTGCard) Hash() string {
+    return objectHash(*card)
+    /*
 	if !card.hashValid {
         hash := fnv.New128a()
 
@@ -397,40 +436,18 @@ func (card *MTGCard) Hash() string {
 	}
 
 	return card.hash
+    */
 }
 
 func (card *MTGCard) Canonicalize() {
     // First, canonicalize the common properties
     card.MTGCardCommon.Canonicalize()
 
-	sort.Sort(ByLanguage(card.AlternateLanguageData))
+	sort.Sort(ByLanguageThenName(card.AlternateLanguageData))
 	sort.Strings(card.Printings)
-	sort.Sort(ByDate(card.Rulings))
+	sort.Sort(ByDateThenText(card.Rulings))
 	sort.Strings(card.FrameEffects)
 	sort.Strings(card.Variations)
 	sort.Strings(card.OtherFaceIds)
 }
 
-func (card *MTGCard) String() string {
-	var builder strings.Builder
-	fmt.Fprintf(&builder, "Card: %s\n", card.Name)
-	fmt.Fprintf(&builder, "\tNames: %s\n", card.Names)
-	fmt.Fprintf(&builder, "\tNumber: %s\n", card.Number)
-	fmt.Fprintf(&builder, "\tPower: %s\n", card.Power)
-	fmt.Fprintf(&builder, "\tColors: %s\n", card.Colors)
-	fmt.Fprintf(&builder, "\tColorIdentity: %s\n", card.ColorIdentity)
-	fmt.Fprintf(&builder, "\tColorIndicator: %s\n", card.ColorIndicator)
-	fmt.Fprintf(&builder, "\tLayout: %s\n", card.Layout)
-	fmt.Fprintf(&builder, "\tLoyalty: %s\n", card.Loyalty)
-	fmt.Fprintf(&builder, "\tSide: %s\n", card.Side)
-	fmt.Fprintf(&builder, "\tSubtypes: %s\n", card.Subtypes)
-	fmt.Fprintf(&builder, "\tSupertypes: %s\n", card.Supertypes)
-	fmt.Fprintf(&builder, "\tType: %s\n", card.Type)
-	fmt.Fprintf(&builder, "\tTypes: %s\n", card.Types)
-	fmt.Fprintf(&builder, "\tUUID: %s\n", card.UUID)
-	fmt.Fprintf(&builder, "\tScryfallId: %s\n", card.ScryfallId)
-	fmt.Fprintf(&builder, "\tScryfallOracleId: %s\n", card.ScryfallOracleId)
-	fmt.Fprintf(&builder, "\tScryfallIllustrationId: %s\n", card.ScryfallIllustrationId)
-	fmt.Fprintf(&builder, "\tOtherFaceIds: %s\n", card.OtherFaceIds)
-	return builder.String()
-}

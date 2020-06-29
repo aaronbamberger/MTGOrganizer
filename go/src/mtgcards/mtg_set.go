@@ -1,19 +1,9 @@
 package mtgcards
 
-import "encoding/binary"
-import "encoding/hex"
 import "fmt"
-import "hash"
-import "hash/fnv"
 import "reflect"
 import "sort"
 import "strings"
-
-func hashToHexString(hashVal hash.Hash) string {
-    hashBytes := make([]byte, 0, hashVal.Size())
-    hashBytes = hashVal.Sum(hashBytes)
-    return hex.EncodeToString(hashBytes)
-}
 
 type MTGSet struct {
 	BaseSetSize int `json:"baseSetSize"`
@@ -86,7 +76,22 @@ func (set *MTGSet) Diff(other *MTGSet) string {
     return b.String()
 }
 
+func (set MTGSet) String() string {
+    var b strings.Builder
+
+    for i, card := range set.Cards {
+        fmt.Fprintf(&b, "Card %d:\n%s\n", i, card)
+    }
+    for i, token := range set.Tokens {
+        fmt.Fprintf(&b, "Token %d:\n%s\n", i, token.Name)
+    }
+
+    return b.String()
+}
+
 func (set *MTGSet) Hash() string {
+    return objectHash(*set)
+    /*
 	if !set.hashValid {
         hash := fnv.New128a()
 		binary.Write(hash, binary.BigEndian, set.BaseSetSize)
@@ -138,6 +143,7 @@ func (set *MTGSet) Hash() string {
 	}
 
 	return set.hash
+    */
 }
 
 func (set *MTGSet) Canonicalize() {
@@ -150,7 +156,7 @@ func (set *MTGSet) Canonicalize() {
 	}
 
     // Tokens
-    sort.Sort(TokenByUUID(set.Tokens))
+    sort.Sort(TokenByUUIDThenSide(set.Tokens))
     for idx := range set.Tokens {
         // Same as above
         set.Tokens[idx].Canonicalize()

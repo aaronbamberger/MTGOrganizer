@@ -27,7 +27,8 @@ const (
     debugDownloadLocation = "./"
 )
 
-func DownloadAllPrintings(useCachedIfAvailable bool, useDebugDownloadLocation bool) (map[string]MTGSet, error) {
+func DownloadAllPrintings(useCachedIfAvailable bool,
+        useDebugDownloadLocation bool) (map[string]MTGSet, error) {
     result, err := downloadData(
         useCachedIfAvailable,
         useDebugDownloadLocation,

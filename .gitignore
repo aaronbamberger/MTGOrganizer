@@ -17,6 +17,7 @@ container-volumes/openldap/conf/*
 web_content/static_content/card_face_images/*.png
 *.swp
 *.swo
+*.swn
 go/src/card-importer/card-importer
 go/src/card-image-downloader/card-image-downloader
 go/src/card-stats/card-stats

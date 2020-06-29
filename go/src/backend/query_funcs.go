@@ -36,20 +36,19 @@ func cardSearch(db *sql.DB,
     defer dbConn.Close()
 
     // * Accept possesives either with or without the apostrophe
-    // * Strip the quotes off of the search name
     // * Match the name on word boundaries so any part of the name can
     //   be searched for
     processedName := strings.ReplaceAll(request, "s", "'?s")
-    processedName = strings.ReplaceAll(processedName, "\"", "")
+    processedName = fmt.Sprintf("\\b%s", processedName)
     res, err := dbConn.QueryContext(
         context.Background(),
         `SELECT DISTINCT
         all_cards.name, all_cards.uuid, sets.name, sets.keyrune_code
         FROM
         all_cards INNER JOIN sets ON all_cards.set_id = sets.set_id
-        WHERE all_cards.name RLIKE ?
+        WHERE all_cards.name RLIKE ? OR all_cards.flavor_name RLIKE ?
         ORDER BY all_cards.name ASC`,
-        fmt.Sprintf("\\b%s", processedName))
+        processedName, processedName)
     if err != nil {
         sendError(done, respChan, err)
         return

@@ -45,14 +45,16 @@ class CardSearch extends React.Component {
 }
 
 function CardSearchResultsTable(props) {
-  const rows = props.cards.map((cardInfo) =>
+  // TODO: Only render the first 10 cards right now for performance reasons
+  const cardsToRender = props.cards.slice(0, 11)
+  const rows = cardsToRender.map((cardInfo) =>
     <CardSearchResultRow
       key={cardInfo.uuid}
       cardName={cardInfo.name}
       cardUUID={cardInfo.uuid}
       setName={cardInfo.setName}
       setCode={cardInfo.setKeyruneCode} />
-    );
+  );
 
   return (
     <div id="card_results">
