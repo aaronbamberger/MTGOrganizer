@@ -24,7 +24,7 @@ class AuthCallbackHandler extends React.Component {
       this.props.userManager.signinRedirectCallback().then((user) => {
         console.log("Completed auth callback");
         console.log(user);
-        this.props.history.replace("/auth_callback");
+        this.props.history.replace("/");
       });
       this.setState({
         loginSuccessful: true,

@@ -2,6 +2,7 @@ const BACKEND_HOSTNAME = "192.168.50.185"
 const LOGIN_CHALLENGE_ENDPOINT = "/backend/login/challenge"
 const LOGIN_CREDS_ENDPOINT = "/backend/login/creds"
 const CONSENT_CHALLENGE_ENDPOINT = "/backend/consent/challenge"
+const LOGOUT_CHALLENGE_ENDPOINT = "/backend/logout/challenge"
 
 // We dynamically request the api name to type mappings when we connect to the
 // backend, but we have to have a statically determined type for the request
@@ -13,5 +14,6 @@ export {BACKEND_HOSTNAME,
         LOGIN_CHALLENGE_ENDPOINT,
         LOGIN_CREDS_ENDPOINT,
         CONSENT_CHALLENGE_ENDPOINT,
+        LOGOUT_CHALLENGE_ENDPOINT,
         API_TYPES_REQUEST,
         API_TYPES_RESPONSE}

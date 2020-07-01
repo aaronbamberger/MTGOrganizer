@@ -8,6 +8,7 @@ import Oidc from 'oidc-client';
 import './App.css';
 import LoginPage from './LoginPage.js';
 import ConsentPage from './ConsentPage.js';
+import LogoutPage from './LogoutPage.js';
 import FrontPageLoggedOut from './FrontPageLoggedOut.js';
 import FrontPageLoggedIn from './FrontPageLoggedIn.js';
 import AuthCallbackHandler from './AuthCallbackHandler.js';
@@ -45,8 +46,10 @@ class MTGOrganizer extends React.Component {
   componentDidMount() {
     this.userManager.getUser().then((user) => {
       if(user) {
-        console.log(user);
+        console.log("Logged in user ", user);
         this.setState({loggedIn: true, user: user});
+      } else {
+        console.log("No user logged in");
       }
     });
   }
@@ -61,6 +64,9 @@ class MTGOrganizer extends React.Component {
           <Route path="/auth/consent">
             <ConsentPage />
           </Route>
+          <Route path="/auth/logout">
+            <LogoutPage />
+          </Route>
           <Route path="/auth_callback">
             <AuthCallbackHandler
               userManager={this.userManager} />
@@ -73,7 +79,7 @@ class MTGOrganizer extends React.Component {
       );
     } else {
       return (
-        <FrontPageLoggedIn />
+        <FrontPageLoggedIn userManager={this.userManager} />
       );
     }
   }

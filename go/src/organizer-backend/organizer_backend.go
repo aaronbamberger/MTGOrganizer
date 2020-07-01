@@ -9,6 +9,7 @@ func main() {
     http.HandleFunc("/backend/login/challenge", backend.HandleLoginChallenge)
     http.HandleFunc("/backend/login/creds", backend.HandleLoginCredentials)
     http.HandleFunc("/backend/consent/challenge", backend.HandleConsentChallenge)
+    http.HandleFunc("/backend/logout/challenge", backend.HandleLogoutChallenge)
     log.Printf("Starting listener...\n")
     http.ListenAndServe(":8085", nil)
     log.Printf("Exiting backend...\n")

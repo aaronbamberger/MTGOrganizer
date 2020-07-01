@@ -19,6 +19,8 @@ const (
     LOGIN_REJECT_ENDPOINT = "/login/reject"
     CONSENT_ENDPOINT = "/consent"
     CONSENT_ACCEPT_ENDPOINT = "/consent/accept"
+    LOGOUT_ENDPOINT = "/logout"
+    LOGOUT_ACCEPT_ENDPOINT = "/logout/accept"
 )
 
 type LoginResult struct {
@@ -33,14 +35,23 @@ type ConsentResult struct {
     GrantScope []string `json:"grant_scope"`
     Remember bool `json:"remember"`
     RememberFor int `json:"remember_for"`
+    Session ConsentSessionInfo `json:"session"`
 }
 
-type LoginChallenge struct {
-    Challenge string `json:"login_challenge"`
+type ConsentSessionInfo struct {
+    IDToken IDTokenSessionInfo `json:"id_token"`
+    // Add AccessToken here if we ever need access_token session info
 }
 
-type ConsentChallenge struct {
-    Challenge string `json:"consent_challenge"`
+type IDTokenSessionInfo struct {
+    Username string `json:"user_name"`
+    Email string `json:"email"`
+    FirstName string `json:"first_name"`
+    LastName string `json:"last_name"`
+}
+
+type Challenge struct {
+    Challenge string `json:"challenge"`
 }
 
 type LoginCredentials struct {
@@ -63,6 +74,13 @@ type HydraLoginRequest struct {
     RequestedScope []string `json:"requested_scope"`
     SessionID string `json:"session_id"`
     Skip bool `json:"skip"`
+    Subject string `json:"subject"`
+}
+
+type HydraLogoutRequest struct {
+    RequestURL string `json:"request_url"`
+    RPInitiated bool `json:"rp_initiated"`
+    SID string `json:"sid"`
     Subject string `json:"subject"`
 }
 
@@ -286,21 +304,44 @@ func completeLoginRequestWithAuthServer(
 
 func completeConsentRequestWithAuthServer(
         consentSuccessful bool,
-        grantScope []string,
-        consentChallenge string) (bool, string, error) {
+        consentRequest HydraConsentRequest) (bool, string, error) {
+
+    // Get the user record from the DB so we can populate extra user info
+    // in the consent acceptance (this will later be returned from requests to the
+    // openid-connect userinfo endpoint)
+    userDB, err := sql.Open("mysql", dbConnStr(LOGIN_DB_USER, LOGIN_DB_PW, USER_DB))
+	if err != nil {
+        log.Printf("Error connecting to users db: %s", err)
+        return false, "", err
+	}
+	defer userDB.Close()
+
+    res := userDB.QueryRow(`SELECT first_name, last_name, email
+            FROM user_info
+            WHERE user_name = ?`,
+            consentRequest.Subject)
+
+    idToken := IDTokenSessionInfo{Username: consentRequest.Subject}
+    err = res.Scan(&idToken.FirstName, &idToken.LastName, &idToken.Email)
+    if err != nil {
+        log.Printf("Error retrieving user info record from db: %s", err)
+        return false, "", err
+    }
+
     // For now, we just blindly consent to everything, since we're running
     // both the app and the authorization provider, there's no need to require
     // the user to consent
     // TODO: Implement the consent reject path
     params := url.Values{}
-    params.Set("consent_challenge", consentChallenge)
+    params.Set("consent_challenge", consentRequest.Challenge)
     requestUrl := AUTHORIZATION_SERVER + AUTHORIZATION_REQUEST_ENDPOINT_BASE +
             CONSENT_ACCEPT_ENDPOINT + "?" + params.Encode()
-    log.Printf("Granting scopes: %v", grantScope)
+    log.Printf("Granting scopes: %v", consentRequest.RequestedScope)
     body := ConsentResult{
-        GrantScope: grantScope,
+        GrantScope: consentRequest.RequestedScope,
         Remember: true,
-        RememberFor: 10}
+        RememberFor: 10,
+        Session: ConsentSessionInfo{IDToken: idToken},}
 
     bodyJson, err := json.Marshal(body)
     if err != nil {
@@ -358,10 +399,65 @@ func completeConsentRequestWithAuthServer(
     }
 }
 
-func checkConsentChallenge(consentChallenge string) (HydraConsentRequest, error) {
-    //consentChallenge = strings.Trim(consentChallenge, "\"")
-    log.Printf("Received consent challenge %s", consentChallenge)
+func completeLogoutRequestWithAuthServer(logoutChallenge string) (bool, string, error) {
+    // For now, no reason to implement the logout reject path, I can't think
+    // of how that would be useful
+    params := url.Values{}
+    params.Set("logout_challenge", logoutChallenge)
+    requestUrl := AUTHORIZATION_SERVER + AUTHORIZATION_REQUEST_ENDPOINT_BASE +
+            LOGOUT_ACCEPT_ENDPOINT + "?" + params.Encode()
 
+    log.Printf("Sending logout request to server at endpoint %s",
+            requestUrl)
+
+    req, err := http.NewRequest(http.MethodPut, requestUrl, http.NoBody)
+    if err != nil {
+        log.Printf("Error creating logout http request: %s", err)
+        return false, "", err
+    }
+    req.Header.Set("Content-Type", "application/json")
+
+    client := &http.Client{}
+    resp, err := client.Do(req)
+    if err != nil {
+        log.Printf("Error sending logout request to auth server: %s", err)
+        return false, "", err
+    }
+    defer resp.Body.Close()
+
+    respBody, err := ioutil.ReadAll(resp.Body)
+    if err != nil {
+        log.Printf("Error reading response body: %s", err)
+        return false, "", err
+    }
+
+    log.Printf("Auth server response: %s", string(respBody))
+
+    switch resp.StatusCode {
+    case http.StatusOK:
+        var completedRequest HydraCompletedRequest
+        err = json.Unmarshal(respBody, &completedRequest)
+        if err != nil {
+            log.Printf("Error unmarshalling completedRequest: %s", err)
+            return false, "", err
+        }
+        return true, completedRequest.RedirectTo, nil
+    case http.StatusNotFound:
+        fallthrough
+    case http.StatusInternalServerError:
+        fallthrough
+    default:
+        var genericError HydraGenericError
+        err = json.Unmarshal(respBody, &genericError)
+        if err != nil {
+            log.Printf("Error unmarshalling genericError: %s", err)
+            return false, "", err
+        }
+        return false, genericError.ErrorMsg, nil
+    }
+}
+
+func checkConsentChallenge(consentChallenge string) (HydraConsentRequest, error) {
     params := url.Values{}
     params.Set("consent_challenge", consentChallenge)
 
@@ -391,9 +487,44 @@ func checkConsentChallenge(consentChallenge string) (HydraConsentRequest, error)
         return HydraConsentRequest{}, err
     }
 
-    log.Printf("Received login consent response: %s", consentRequest)
+    log.Printf("Received consent consent response: %s", consentRequest)
 
     return consentRequest, nil
+}
+
+func checkLogoutChallenge(logoutChallenge string) (HydraLogoutRequest, error) {
+    params := url.Values{}
+    params.Set("logout_challenge", logoutChallenge)
+
+    // First, we need to interrogate the authorization server for the details
+    // of the logout request
+    requestUrl := AUTHORIZATION_SERVER + AUTHORIZATION_REQUEST_ENDPOINT_BASE +
+            LOGOUT_ENDPOINT + "?" + params.Encode()
+    log.Printf("Sending logout challenge request %s", requestUrl)
+
+    resp, err := http.Get(requestUrl)
+    if err != nil {
+        log.Printf("Error sending logout request: %s", err)
+        return HydraLogoutRequest{}, err
+    }
+    defer resp.Body.Close()
+
+    respBody, err := ioutil.ReadAll(resp.Body)
+    if err != nil {
+        log.Printf("Error reading logout request response: %s", err)
+        return HydraLogoutRequest{}, err
+    }
+
+    var logoutRequest HydraLogoutRequest
+    err = json.Unmarshal(respBody, &logoutRequest)
+    if err != nil {
+        log.Printf("Error unmarshalling logout request response: %s", err)
+        return HydraLogoutRequest{}, err
+    }
+
+    log.Printf("Received logout consent response: %s", logoutRequest)
+
+    return logoutRequest, nil
 }
 
 func sendHttpError(resp http.ResponseWriter) {
@@ -437,15 +568,15 @@ func HandleLoginChallenge(resp http.ResponseWriter, req *http.Request) {
         return
     }
 
-    var loginChallenge LoginChallenge
-    err = json.Unmarshal(request, &loginChallenge)
+    var challenge Challenge
+    err = json.Unmarshal(request, &challenge)
     if err != nil {
         log.Printf("Error unmarshalling login challenge request: %s", err)
         sendHttpError(resp)
         return
     }
 
-    loginRequest, err := checkLoginChallenge(loginChallenge.Challenge)
+    loginRequest, err := checkLoginChallenge(challenge.Challenge)
     if err != nil {
         log.Print(err)
         sendHttpError(resp)
@@ -460,7 +591,7 @@ func HandleLoginChallenge(resp http.ResponseWriter, req *http.Request) {
         // authentication with the backend
         authSuccessful, authResponse, err := completeLoginRequestWithAuthServer(true,
             loginRequest.Subject,
-            loginChallenge.Challenge)
+            challenge.Challenge)
         if err != nil {
             log.Printf("Error completing skipped authentication: %s", err)
             sendHttpError(resp)
@@ -538,15 +669,15 @@ func HandleConsentChallenge(resp http.ResponseWriter, req *http.Request) {
         return
     }
 
-    var consentChallenge ConsentChallenge
-    err = json.Unmarshal(request, &consentChallenge)
+    var challenge Challenge
+    err = json.Unmarshal(request, &challenge)
     if err != nil {
         log.Printf("Error unmarshalling consent challenge request: %s", err)
         sendHttpError(resp)
         return
     }
 
-    consentRequest, err := checkConsentChallenge(consentChallenge.Challenge)
+    consentRequest, err := checkConsentChallenge(challenge.Challenge)
     if err != nil {
         log.Print(err)
         sendHttpError(resp)
@@ -557,8 +688,7 @@ func HandleConsentChallenge(resp http.ResponseWriter, req *http.Request) {
     // both the app and the authorization service, we assume we want to grant
     // access to everything.  Potentially implement this more fully in the future
     consentSuccessful, consentResponse, err := completeConsentRequestWithAuthServer(true,
-        consentRequest.RequestedScope,
-        consentRequest.Challenge)
+        consentRequest)
     if err != nil {
         log.Printf("Error completing consent: %s", err)
         sendHttpError(resp)
@@ -569,6 +699,48 @@ func HandleConsentChallenge(resp http.ResponseWriter, req *http.Request) {
         sendHttpRedirect(resp, consentResponse)
     } else {
         sendHttpAuthErrorMsg(resp, consentResponse)
+    }
+}
+
+func HandleLogoutChallenge(resp http.ResponseWriter, req *http.Request) {
+    defer req.Body.Close()
+
+    request, err := ioutil.ReadAll(req.Body)
+    if err != nil {
+        log.Printf("Error reading logout challenge request: %s", err)
+        sendHttpError(resp)
+        return
+    }
+
+    var challenge Challenge
+    err = json.Unmarshal(request, &challenge)
+    if err != nil {
+        log.Printf("Error unmarshalling logout challenge request: %s", err)
+        sendHttpError(resp)
+        return
+    }
+
+    logoutRequest, err := checkLogoutChallenge(challenge.Challenge)
+    log.Printf("Logging out session %s", logoutRequest.SID)
+    if err != nil {
+        log.Print(err)
+        sendHttpError(resp)
+        return
+    }
+
+    // Just accept the logout request, nothing else to do here
+    logoutSuccessful, logoutResponse, err := completeLogoutRequestWithAuthServer(
+        challenge.Challenge)
+    if err != nil {
+        log.Printf("Error completing logout: %s", err)
+        sendHttpError(resp)
+        return
+    }
+
+    if logoutSuccessful {
+        sendHttpRedirect(resp, logoutResponse)
+    } else {
+        sendHttpAuthErrorMsg(resp, logoutResponse)
     }
 }
 

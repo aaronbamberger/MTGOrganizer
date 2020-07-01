@@ -4,6 +4,8 @@ import {
   Route
 } from 'react-router-dom';
 
+import AccountInfoWidget from './AccountInfoWidget.js';
+
 import {BACKEND_HOSTNAME, API_TYPES_REQUEST, API_TYPES_RESPONSE} from './Constants.js';
 import CardDetail from './CardDetail.js';
 import {CardSearch} from './CardSearch.js';
@@ -20,7 +22,7 @@ class FrontPageLoggedIn extends React.Component {
     this.state = {
       socketConnected: false,
       apiTypesReceived: false,
-      apiTypesMap: {}
+      apiTypesMap: {},
     };
 
     this.backendSocket = new WebSocket('ws://' + BACKEND_HOSTNAME + '/backend/api');
@@ -67,20 +69,23 @@ class FrontPageLoggedIn extends React.Component {
       )
     } else {
       return (
-        <Switch>
-          <Route path="/card/:uuid">
-            <CardDetail
-              wrappedComponentRef={this.cardDetail}
-              backendRequest={this.backendRequest}
-              apiTypesMap={this.state.apiTypesMap} />
-          </Route>
-          <Route path="/">
-            <CardSearch
-              ref={this.cardSearch}
-              backendRequest={this.backendRequest}
-              apiTypesMap={this.state.apiTypesMap} />
-          </Route>
-        </Switch>
+        <div>
+          <AccountInfoWidget userManager={this.props.userManager} />
+          <Switch>
+            <Route path="/card/:uuid">
+              <CardDetail
+                wrappedComponentRef={this.cardDetail}
+                backendRequest={this.backendRequest}
+                apiTypesMap={this.state.apiTypesMap} />
+            </Route>
+            <Route path="/">
+              <CardSearch
+                ref={this.cardSearch}
+                backendRequest={this.backendRequest}
+                apiTypesMap={this.state.apiTypesMap} />
+            </Route>
+          </Switch>
+        </div>
       );
     }
   }

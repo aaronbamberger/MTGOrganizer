@@ -9,8 +9,6 @@ class LoginPage extends React.Component {
 
     let urlParams = new URLSearchParams(window.location.search);
 
-    console.log(urlParams.get('login_challenge'));
-
     this.state = {
       login_needed: false,
       username: '',
@@ -32,7 +30,7 @@ class LoginPage extends React.Component {
     const req = new Request("http://" + BACKEND_HOSTNAME + LOGIN_CHALLENGE_ENDPOINT,
       {
         method: "POST",
-        body: JSON.stringify({"login_challenge": this.state.login_challenge}),
+        body: JSON.stringify({"challenge": this.state.login_challenge}),
       }
     );
     fetch(req).then(response => {

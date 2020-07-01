@@ -1,27 +1,27 @@
 import React from 'react';
 import {BACKEND_HOSTNAME,
-        CONSENT_CHALLENGE_ENDPOINT} from './Constants.js'
+        LOGOUT_CHALLENGE_ENDPOINT} from './Constants.js'
 
-class ConsentPage extends React.Component {
+class LogoutPage extends React.Component {
   constructor(props) {
     super(props);
 
     let urlParams = new URLSearchParams(window.location.search);
 
     this.state = {
-      consent_challenge: urlParams.get('consent_challenge'),
+      logout_challenge: urlParams.get('logout_challenge'),
     }
   }
 
   componentDidMount() {
-    this.sendConsentChallengeRequest()
+    this.sendLogoutChallengeRequest()
   }
 
-  sendConsentChallengeRequest() {
-    const req = new Request("http://" + BACKEND_HOSTNAME + CONSENT_CHALLENGE_ENDPOINT,
+  sendLogoutChallengeRequest() {
+    const req = new Request("http://" + BACKEND_HOSTNAME + LOGOUT_CHALLENGE_ENDPOINT,
       {
         method: "POST",
-        body: JSON.stringify({"challenge": this.state.consent_challenge}),
+        body: JSON.stringify({"challenge": this.state.logout_challenge}),
       }
     );
     fetch(req).then(response => {
@@ -37,4 +37,4 @@ class ConsentPage extends React.Component {
   }
 }
 
-export default ConsentPage;
+export default LogoutPage;
