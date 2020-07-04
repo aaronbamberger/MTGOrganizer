@@ -15,8 +15,7 @@ function CardImage(props) {
   const imageStyle = {
     width: props.sizePercent + '%',
     height: props.sizePercent + '%',
-    opacity: props.isDisabled ? '50%' : '100%'}
-
+  };
 
   return (
     <img

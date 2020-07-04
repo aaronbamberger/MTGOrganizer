@@ -5,6 +5,8 @@ export const REQUEST_CARD_DETAIL = 'REQUEST_CARD_DETAIL'
 export const RECEIVE_CARD_DETAIL = 'RECEIVE_CARD_DETAIL'
 export const CANCEL_CARD_DETAIL_REQUEST = 'CANCEL_CARD_DETAIL_REQUEST'
 export const UPDATE_BACKEND_CONNECTION_STATE = 'UPDATE_BACKEND_CONNECTION_STATE'
+export const UPDATE_API_TYPES_RECEIVED = 'UPDATE_API_TYPES_RECEIVED'
+export const UPDATE_AUTH_COMPLETED = 'UPDATE_AUTH_COMPLETED'
 
 export function requestCardSearchResults(searchTerm) {
   return {
@@ -50,5 +52,19 @@ export function updateBackendConnectionState(connected) {
   return {
     type: UPDATE_BACKEND_CONNECTION_STATE,
     connected: connected,
+  }
+}
+
+export function updateApiTypesReceived(received) {
+  return {
+    type: UPDATE_API_TYPES_RECEIVED,
+    received: received,
+  }
+}
+
+export function updateAuthCompleted(completed) {
+  return {
+    type: UPDATE_AUTH_COMPLETED,
+    completed: completed,
   }
 }

@@ -2,6 +2,7 @@ import React from 'react';
 import { connect } from 'react-redux';
 
 import {
+  BACKEND_HOSTNAME,
   API_TYPES_REQUEST,
   API_TYPES_RESPONSE
 } from './Constants.js';
@@ -11,6 +12,7 @@ import {
   receiveCardDetail,
   cancelCardDetailRequest,
   updateBackendConnectionState,
+  updateApiTypesReceived,
 } from './ReduxActions.js'
 
 const mapStateToProps = (state) => {
@@ -30,21 +32,15 @@ class WebsocketHandler extends React.Component {
     this.handleWebsocketOpen = this.handleWebsocketOpen.bind(this);
     this.handleWebsocketMessage = this.handleWebsocketMessage.bind(this);
 
+    this.backendSocket = new WebSocket('ws://' + BACKEND_HOSTNAME + '/backend/api');
+    this.backendSocket.addEventListener('open', this.handleWebsocketOpen);
+    this.backendSocket.addEventListener('message', this.handleWebsocketMessage);
+
     this.state = {
       socketConnected: false,
       apiTypesReceived: false,
       apiTypesMap: {},
     };
-
-    this.props.backendSocket.addEventListener('message', this.handleWebsocketMessage);
-  }
-
-  componentDidMount() {
-    if (this.props.backendSocket.readyState === WebSocket.OPEN) {
-      this.handleWebsocketOpen();
-    } else {
-      this.props.backendSocket.addEventListener('open', this.handleWebsocketOpen);
-    }
   }
 
   componentDidUpdate() {
@@ -74,7 +70,6 @@ class WebsocketHandler extends React.Component {
   }
 
   handleWebsocketOpen(event) {
-    this.setState({socketConnected: true});
     // Request the list of api name to type mappings from the backend
     this.backendRequest(JSON.stringify({"type": API_TYPES_REQUEST, "value": ""}));
     this.props.dispatch(updateBackendConnectionState(true));
@@ -86,7 +81,8 @@ class WebsocketHandler extends React.Component {
     console.log('Response type: ' + response.type);
     switch (response.type) {
       case API_TYPES_RESPONSE:
-        this.setState({apiTypesMap: response.value, apiTypesReceived: true});
+        this.setState({apiTypesMap: response.value});
+        this.props.dispatch(updateApiTypesReceived(true));
         break;
       case this.state.apiTypesMap.CardSearchResponse:
         this.props.dispatch(receiveCardSearchResults(response.value));
@@ -94,16 +90,18 @@ class WebsocketHandler extends React.Component {
       case this.state.apiTypesMap.CardDetailResponse:
         this.props.dispatch(receiveCardDetail(response.value));
         break;
+      default:
+        break;
     }
   }
 
   backendRequest(request) {
     // Only send a request if the socket is in the "OPEN" state
-    if (this.props.backendSocket.readyState === WebSocket.OPEN) {
-      this.props.backendSocket.send(request);
+    if (this.backendSocket.readyState === WebSocket.OPEN) {
+      this.backendSocket.send(request);
     } else {
       console.log("Can't send request " + request + " to websocket, in state " +
-        this.props.backendSocket.readyState);
+        this.backendSocket.readyState);
     }
   }
 

@@ -10,34 +10,34 @@ import CardDetail from './CardDetail.js';
 import CardSearchWidget from './CardSearch.js';
 import WebsocketHandler from './WebsocketHandler.js';
 
-import { BACKEND_HOSTNAME } from './Constants.js';
-
 const mapStateToProps = (state) => {
   return {
-    backendConnected: state.backendState.connected,
+    backendReady: state.backendState.ready,
   };
 }
 
 class FrontPageLoggedIn extends React.Component {
-  constructor(props) {
-    super(props);
-
-    this.backendSocket = new WebSocket('ws://' + BACKEND_HOSTNAME + '/backend/api');
-  }
-
   render() {
+    const loadingDisplay = this.props.backendReady ? 'none' : 'initial';
+    const uiDisplay = this.props.backendReady ? 'initial' : 'none';
+
     return (
       <div>
-        <WebsocketHandler backendSocket={this.backendSocket} />
-        <AccountInfoWidget userManager={this.props.userManager} />
-        <Switch>
-          <Route path="/card/:uuid">
-            <CardDetail />
-          </Route>
-          <Route path="/">
-            <CardSearchWidget />
-          </Route>
-        </Switch>
+        <WebsocketHandler />
+        <div id="loading_message" style={{display: loadingDisplay}}>
+          <h2>Loading UI...</h2>
+        </div>
+        <div id="main_ui" style={{display: uiDisplay}}>
+          <AccountInfoWidget userManager={this.props.userManager} />
+          <Switch>
+            <Route path="/card/:uuid">
+              <CardDetail />
+            </Route>
+            <Route path="/">
+              <CardSearchWidget />
+            </Route>
+          </Switch>
+        </div>
       </div>
     );
   }

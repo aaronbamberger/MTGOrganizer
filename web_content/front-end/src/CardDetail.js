@@ -1,5 +1,5 @@
 import React from 'react';
-import { withRouter, Link } from 'react-router-dom';
+import { withRouter, NavLink } from 'react-router-dom';
 import { connect } from 'react-redux';
 
 import { CardImage } from './CardComponents.js';
@@ -7,6 +7,7 @@ import { requestCardDetail } from './ReduxActions.js';
 
 const mapStateToProps = (state) => {
   return {
+    backendReady: state.backendState.ready,
     cardUUID: state.cardDetail.uuid,
     cardDetail: state.cardDetail.cardDetail,
   };
@@ -14,12 +15,23 @@ const mapStateToProps = (state) => {
 
 class CardDetail extends React.Component {
   componentDidMount() {
-    this.sendRequestForUpdatedCardInfo();
+    if (this.props.backendReady) {
+      this.sendRequestForUpdatedCardInfo();
+    }
   }
 
   componentDidUpdate() {
     if (this.props.cardDetail) {
       if (this.props.cardUUID !== this.props.match.params.uuid) {
+        console.log("Sent request due to uuid mismatch");
+        this.sendRequestForUpdatedCardInfo();
+      }
+    } else {
+      // If we haven't received a card detail object yet, check to see
+      // if the backend just became ready, and if so, sent a request for the
+      // detail info
+      if (this.props.backendReady) {
+        console.log("Sent request due to backend ready");
         this.sendRequestForUpdatedCardInfo();
       }
     }
@@ -33,6 +45,9 @@ class CardDetail extends React.Component {
   render() {
     if (this.props.cardDetail) {
       let variations = [ this.props.cardUUID ].concat(this.props.cardDetail.variations);
+      console.log("Card UUID: " + this.props.cardUUID);
+      console.log("Card Variations: ", this.props.cardDetail.variations);
+      console.log("Variations List: ", variations);
       variations.sort();
       let variationLinks = null
       if (variations.length > 1) {
@@ -40,16 +55,19 @@ class CardDetail extends React.Component {
           <div>
             Variations:
             {variations.map((variationUUID, i) =>
-              <Link key={variationUUID} to={"/card/" + variationUUID}>
+              <NavLink
+                  key={variationUUID}
+                  to={"/card/" + variationUUID}
+                  activeStyle={{opacity: "50%", pointerEvents: "none"}}>
                 <CardImage
                   uuid={variationUUID}
-                  sizePercent={5}
-                  isDisabled={this.uuid === variationUUID} />
-              </Link>)}
+                  sizePercent={5} />
+              </NavLink>)}
               &nbsp;
           </div>
         );
       }
+      console.log("Variation links length: ", variationLinks.props.children.length);
 
       let legalities = null
       if (Object.keys(this.props.cardDetail.legalities).length > 0) {
