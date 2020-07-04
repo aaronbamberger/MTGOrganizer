@@ -1,45 +1,38 @@
 import React from 'react';
-import {withRouter, Link} from 'react-router-dom';
+import { withRouter, Link } from 'react-router-dom';
+import { connect } from 'react-redux';
 
-import {CardImage} from './CardComponents.js';
+import { CardImage } from './CardComponents.js';
+import { requestCardDetail } from './ReduxActions.js';
+
+const mapStateToProps = (state) => {
+  return {
+    cardUUID: state.cardDetail.uuid,
+    cardDetail: state.cardDetail.cardDetail,
+  };
+}
 
 class CardDetail extends React.Component {
-  constructor(props) {
-    super(props);
-
-    this.receiveCardDetail = this.receiveCardDetail.bind(this);
-
-    this.uuid = props.match.params.uuid;
-    this.state = {CardDetail: null};
-  }
-
   componentDidMount() {
     this.sendRequestForUpdatedCardInfo();
   }
 
   componentDidUpdate() {
-    if (this.uuid !== this.props.match.params.uuid) {
-      this.uuid = this.props.match.params.uuid;
-      this.sendRequestForUpdatedCardInfo();
+    if (this.props.cardDetail) {
+      if (this.props.cardUUID !== this.props.match.params.uuid) {
+        this.sendRequestForUpdatedCardInfo();
+      }
     }
   }
 
-  receiveCardDetail(newCardDetail) {
-    this.setState({CardDetail: newCardDetail});
-  }
-
   sendRequestForUpdatedCardInfo() {
-    const request = JSON.stringify(
-      {
-        "type": this.props.apiTypesMap.CardDetailRequest,
-        "value": this.uuid
-      });
-    this.props.backendRequest(request);
+    const uuid = this.props.match.params.uuid;
+    this.props.dispatch(requestCardDetail(uuid));
   }
 
   render() {
-    if (this.state.CardDetail) {
-      let variations = [ this.uuid ].concat(this.state.CardDetail.variations);
+    if (this.props.cardDetail) {
+      let variations = [ this.props.cardUUID ].concat(this.props.cardDetail.variations);
       variations.sort();
       let variationLinks = null
       if (variations.length > 1) {
@@ -59,32 +52,32 @@ class CardDetail extends React.Component {
       }
 
       let legalities = null
-      if (Object.keys(this.state.CardDetail.legalities).length > 0) {
+      if (Object.keys(this.props.cardDetail.legalities).length > 0) {
         legalities = (
           <SortedKeyValueTable
             keyHeader="Game Format"
             valueHeader="Legality"
-            data={this.state.CardDetail.legalities} />
+            data={this.props.cardDetail.legalities} />
         );
       }
 
       let leadershipSkills = null
-      if (Object.keys(this.state.CardDetail.leadershipSkills).length > 0) {
+      if (Object.keys(this.props.cardDetail.leadershipSkills).length > 0) {
         leadershipSkills = (
           <SortedKeyValueTable
             keyHeader="Game Format"
             valueHeader="Leader Legal?"
-            data={this.state.CardDetail.leadershipSkills} />
+            data={this.props.cardDetail.leadershipSkills} />
         );
       }
 
       return (
         <div>
-          <div>Name: {this.state.CardDetail.name}</div>
-          <div>Artist: {this.state.CardDetail.artist}</div>
+          <div>Name: {this.props.cardDetail.name}</div>
+          <div>Artist: {this.props.cardDetail.artist}</div>
           <CardImage
-            uuid={this.uuid}
-            name={this.state.CardDetail.name}
+            uuid={this.props.cardUUID}
+            name={this.props.cardDetail.name}
             sizePercent={20} />
           {variationLinks}
           {legalities}
@@ -134,4 +127,4 @@ function KeyValueTableRow(props) {
   );
 }
 
-export default withRouter(CardDetail);
+export default connect(mapStateToProps)(withRouter(CardDetail));

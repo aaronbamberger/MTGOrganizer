@@ -1,27 +1,26 @@
 import React from 'react';
-import {Link} from "react-router-dom";
+import {Link} from 'react-router-dom';
+import {connect} from 'react-redux';
 
 import {SetSymbol} from './CardComponents.js';
+import {requestCardSearchResults} from './ReduxActions.js';
+
+const mapStateToProps = (state) => {
+  return {
+    cards: state.cardSearch.searchResults,
+  };
+}
 
 class CardSearch extends React.Component {
   constructor(props) {
     super(props);
 
-    this.state = {cards: []}
-    
     this.handleInput = this.handleInput.bind(this);
   }
 
   handleInput(event) {
     if (event.target.value.length > 1) {
-      const request = JSON.stringify(
-        {
-          "type": this.props.apiTypesMap.CardSearchRequest,
-          "value": event.target.value
-        });
-      this.props.backendRequest(request)
-    } else {
-      this.setState({cards: []});
+      this.props.dispatch(requestCardSearchResults(event.target.value));
     }
   }
 
@@ -38,7 +37,7 @@ class CardSearch extends React.Component {
             <input type="text" onInput={this.handleInput} />
           </label>
         </form>
-        <CardSearchResultsTable cards={this.state.cards} />
+        <CardSearchResultsTable cards={this.props.cards} />
       </div>
     );
   }
@@ -74,16 +73,18 @@ function CardSearchResultsTable(props) {
 }
 
 function CardSearchResultRow(props) {
-    return (
-      <tr>
-        <td>
-          <Link to={"/card/" + props.cardUUID}>
-            {props.cardName}
-          </Link>
-        </td>
-        <td><SetSymbol setName={props.setName} setCode={props.setCode} /></td>
-      </tr>
-    );
+  return (
+    <tr>
+      <td>
+        <Link to={"/card/" + props.cardUUID}>
+          {props.cardName}
+        </Link>
+      </td>
+      <td><SetSymbol setName={props.setName} setCode={props.setCode} /></td>
+    </tr>
+  );
 }
 
-export {CardSearch, CardSearchResultsTable, CardSearchResultRow};
+const CardSearchWidget = connect(mapStateToProps)(CardSearch);
+
+export default CardSearchWidget;

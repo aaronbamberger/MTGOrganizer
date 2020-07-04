@@ -4,6 +4,8 @@ import {
   Switch,
   Route
 } from 'react-router-dom';
+import { createStore, combineReducers } from 'redux';
+import { Provider } from 'react-redux';
 import Oidc from 'oidc-client';
 import './App.css';
 import LoginPage from './LoginPage.js';
@@ -12,13 +14,27 @@ import LogoutPage from './LogoutPage.js';
 import FrontPageLoggedOut from './FrontPageLoggedOut.js';
 import FrontPageLoggedIn from './FrontPageLoggedIn.js';
 import AuthCallbackHandler from './AuthCallbackHandler.js';
+import {
+  cardSearchReducer,
+  cardDetailReducer,
+  backendStateReducer,
+} from './ReduxReducers.js';
 
 function App() {
+  const rootReducer = combineReducers({
+    cardSearch: cardSearchReducer,
+    cardDetail: cardDetailReducer,
+    backendState: backendStateReducer,
+  });
+  const reduxStore = createStore(rootReducer);
+
   return (
     <div className="App">
-      <Router>
-        <MTGOrganizer />
-      </Router>
+      <Provider store={reduxStore}>
+        <Router>
+          <MTGOrganizer />
+        </Router>
+      </Provider>
     </div>
   );
 }
@@ -79,7 +95,9 @@ class MTGOrganizer extends React.Component {
       );
     } else {
       return (
-        <FrontPageLoggedIn userManager={this.userManager} />
+        <FrontPageLoggedIn
+          userManager={this.userManager}
+          reduxStore={this.props.reduxStore} />
       );
     }
   }

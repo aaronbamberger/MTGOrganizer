@@ -3,92 +3,44 @@ import {
   Switch,
   Route
 } from 'react-router-dom';
+import { connect } from 'react-redux';
 
 import AccountInfoWidget from './AccountInfoWidget.js';
-
-import {BACKEND_HOSTNAME, API_TYPES_REQUEST, API_TYPES_RESPONSE} from './Constants.js';
 import CardDetail from './CardDetail.js';
-import {CardSearch} from './CardSearch.js';
+import CardSearchWidget from './CardSearch.js';
+import WebsocketHandler from './WebsocketHandler.js';
+
+import { BACKEND_HOSTNAME } from './Constants.js';
+
+const mapStateToProps = (state) => {
+  return {
+    backendConnected: state.backendState.connected,
+  };
+}
 
 class FrontPageLoggedIn extends React.Component {
   constructor(props) {
     super(props);
 
-    this.cardSearch = React.createRef();
-    this.cardDetail = React.createRef();
-
-    this.backendRequest = this.backendRequest.bind(this);
-
-    this.state = {
-      socketConnected: false,
-      apiTypesReceived: false,
-      apiTypesMap: {},
-    };
-
     this.backendSocket = new WebSocket('ws://' + BACKEND_HOSTNAME + '/backend/api');
-    this.backendSocket.addEventListener('open', this.handleWebsocketOpen.bind(this));
-    this.backendSocket.addEventListener('message', this.handleWebsocketMessage.bind(this));
-  }
-
-  handleWebsocketOpen(event) {
-    this.setState({socketConnected: true});
-    // Request the list of api name to type mappings from the backend
-    this.backendRequest(JSON.stringify({"type": API_TYPES_REQUEST, "value": ""}))
-    console.log("Websocket open: " + event);
-  }
-
-  handleWebsocketMessage(event) {
-    const response = JSON.parse(event.data);
-    console.log('Response type: ' + response.type);
-    if (response.type === API_TYPES_RESPONSE) {
-      this.setState({apiTypesMap: response.value, apiTypesReceived: true})
-      console.log('Received types map');
-    } else if (response.type === this.state.apiTypesMap.CardSearchResponse) {
-      this.cardSearch.current.receiveNewCards(response.value);
-    } else if (response.type === this.state.apiTypesMap.CardDetailResponse) {
-      this.cardDetail.current.receiveCardDetail(response.value);
-    }
-  }
-
-  backendRequest(request) {
-    // Only send a request if the socket is in the "OPEN" state
-    if (this.backendSocket.readyState === 1) {
-      this.backendSocket.send(request);
-    } else {
-      console.log("Can't send request " + request + " to websocket, in state " +
-        this.backendSocket.readyState);
-    }
   }
 
   render() {
-    if (!(this.state.socketConnected && this.state.apiTypesReceived)) {
-      return (
-        <div>
-          <h2>Loading UI...</h2>
-        </div>
-      )
-    } else {
-      return (
-        <div>
-          <AccountInfoWidget userManager={this.props.userManager} />
-          <Switch>
-            <Route path="/card/:uuid">
-              <CardDetail
-                wrappedComponentRef={this.cardDetail}
-                backendRequest={this.backendRequest}
-                apiTypesMap={this.state.apiTypesMap} />
-            </Route>
-            <Route path="/">
-              <CardSearch
-                ref={this.cardSearch}
-                backendRequest={this.backendRequest}
-                apiTypesMap={this.state.apiTypesMap} />
-            </Route>
-          </Switch>
-        </div>
-      );
-    }
+    return (
+      <div>
+        <WebsocketHandler backendSocket={this.backendSocket} />
+        <AccountInfoWidget userManager={this.props.userManager} />
+        <Switch>
+          <Route path="/card/:uuid">
+            <CardDetail />
+          </Route>
+          <Route path="/">
+            <CardSearchWidget />
+          </Route>
+        </Switch>
+      </div>
+    );
   }
 }
 
-export default FrontPageLoggedIn;
+export default connect(mapStateToProps)(FrontPageLoggedIn);
