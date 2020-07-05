@@ -7,7 +7,7 @@ import { requestCardDetail } from './ReduxActions.js';
 
 const mapStateToProps = (state) => {
   return {
-    backendReady: state.backendState.ready,
+    backendReady: state.backend.ready,
     cardUUID: state.cardDetail.uuid,
     cardDetail: state.cardDetail.cardDetail,
   };
@@ -67,7 +67,6 @@ class CardDetail extends React.Component {
           </div>
         );
       }
-      console.log("Variation links length: ", variationLinks.props.children.length);
 
       let legalities = null
       if (Object.keys(this.props.cardDetail.legalities).length > 0) {

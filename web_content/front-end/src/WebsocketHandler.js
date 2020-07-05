@@ -13,10 +13,24 @@ import {
   cancelCardDetailRequest,
   updateBackendConnectionState,
   updateApiTypesReceived,
+  setAuthRequestPending,
+  updateAuthCompleted,
 } from './ReduxActions.js'
-
+/*
+const backendDefaultState = {
+  connected: false,
+  apiTypesReceived: false,
+  authCompleted: false,
+  authRequestPending: false,
+  ready: false,
+}
+*/
 const mapStateToProps = (state) => {
   return {
+    backendConnected: state.backend.connected,
+    backendApiTypesReceived: state.backend.apiTypesReceived,
+    backendAuthRequestPending: state.backend.authRequestPending,
+    user: state.user.user,
     cardSearchRequest: state.cardSearch.searchRequested,
     cardSearchTerm: state.cardSearch.searchTerm,
     cardDetailRequest: state.cardDetail.searchRequested,
@@ -44,6 +58,20 @@ class WebsocketHandler extends React.Component {
   }
 
   componentDidUpdate() {
+    // Authenticate to the backend if we're connected and have received the
+    // api types map
+    if (this.props.backendConnected && this.props.backendApiTypesReceived &&
+        !this.props.backendAuthRequestPending) {
+      const request = JSON.stringify({
+        "type": this.state.apiTypesMap.AuthUserRequest,
+        "value": {
+          "token": this.props.user.access_token,
+          "subject": this.props.user.profile.sub,
+        },
+      });
+      this.backendRequest(request);
+    }
+
     // Handle a new card search request
     if (this.props.cardSearchRequest) {
       // Construct and send the backend request
@@ -90,6 +118,10 @@ class WebsocketHandler extends React.Component {
       case this.state.apiTypesMap.CardDetailResponse:
         this.props.dispatch(receiveCardDetail(response.value));
         break;
+      case this.state.apiTypesMap.AuthUserResponse:
+        if (response.value.auth_successful) {
+          this.props.dispatch(updateAuthCompleted(true));
+        }
       default:
         break;
     }

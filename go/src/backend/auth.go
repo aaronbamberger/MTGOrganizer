@@ -21,6 +21,7 @@ const (
     CONSENT_ACCEPT_ENDPOINT = "/consent/accept"
     LOGOUT_ENDPOINT = "/logout"
     LOGOUT_ACCEPT_ENDPOINT = "/logout/accept"
+    TOKEN_INTROSPECTION_ENDPOINT = "/oauth2/introspect"
 )
 
 type LoginResult struct {
@@ -64,6 +65,15 @@ type FrontendLoginDisplayParams struct {
     DisplayLoginUI bool `json:"display_login_ui"`
 }
 
+type AuthRequest struct {
+    AuthToken string `json:"token"`
+    Subject string `json:"subject"`
+}
+
+type AuthResult struct {
+    AuthSuccessful bool `json:"auth_successful"`
+}
+
 type HydraCompletedRequest struct {
     RedirectTo string `json:"redirect_to"`
 }
@@ -93,6 +103,21 @@ type HydraConsentRequest struct {
     RequestedScope []string `json:"requested_scope"`
     Skip bool `json:"skip"`
     Subject string `json:"subject"`
+}
+
+type HydraOauth2TokenIntrospection struct {
+    Active bool `json:"active"`
+    Audience []string `json:"aud"`
+    ClientID string `json:"client_id"`
+    Expiration int64 `json:"exp"`
+    IssuedAt int64 `json:"iat"`
+    IssuerURL string `json:"iss"`
+    NotBefore int64 `json:"nbf"`
+    ObfuscatedSubject string `json:"obfuscated_subject"`
+    Scope string `json:"scope"`
+    Subject string `json:"sub"`
+    TokenType string `json:"token_type"`
+    Username string `json:"username"`
 }
 
 type HydraGenericError struct {
@@ -525,6 +550,72 @@ func checkLogoutChallenge(logoutChallenge string) (HydraLogoutRequest, error) {
     log.Printf("Received logout consent response: %s", logoutRequest)
 
     return logoutRequest, nil
+}
+
+func authorizeToken(
+        subject string,
+        token string,
+        done <-chan interface{},
+        respChan chan<- ResponseMessage) bool {
+
+    requestBody := url.Values{}
+    requestBody.Set("token", token)
+    requestUrl := AUTHORIZATION_SERVER + TOKEN_INTROSPECTION_ENDPOINT
+
+    log.Printf("Sending token introspection with body %v", requestBody);
+
+    resp, err := http.PostForm(requestUrl, requestBody)
+    if err != nil {
+        log.Printf("Error sending token introspection request: %s", err)
+        return false
+    }
+
+    defer resp.Body.Close()
+
+    respBody, err := ioutil.ReadAll(resp.Body)
+    if err != nil {
+        log.Printf("Error reading response body: %s", err)
+        return false
+    }
+
+    log.Printf("Auth server response: %s", string(respBody))
+
+    switch resp.StatusCode {
+    case http.StatusOK:
+        var tokenIntrospection HydraOauth2TokenIntrospection
+        err = json.Unmarshal(respBody, &tokenIntrospection)
+        if err != nil {
+            log.Printf("Error unmarshalling token introspection: %s", err)
+            return false
+        }
+
+        authResult := AuthResult{}
+        if tokenIntrospection.Active && tokenIntrospection.Subject == subject {
+            authResult.AuthSuccessful = true
+        } else {
+            authResult.AuthSuccessful = false
+        }
+
+        select {
+        case <-done:
+        case respChan <- ResponseMessage{Type: AuthUserResponse, Value: authResult}:
+        }
+        return authResult.AuthSuccessful
+
+    case http.StatusUnauthorized:
+        fallthrough
+    case http.StatusInternalServerError:
+        fallthrough
+    default:
+        var genericError HydraGenericError
+        err = json.Unmarshal(respBody, &genericError)
+        if err != nil {
+            log.Printf("Error unmarshalling genericError: %s", err)
+            return false
+        }
+    }
+
+    return false
 }
 
 func sendHttpError(resp http.ResponseWriter) {

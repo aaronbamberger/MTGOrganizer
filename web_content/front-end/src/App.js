@@ -5,8 +5,9 @@ import {
   Route
 } from 'react-router-dom';
 import { createStore, combineReducers } from 'redux';
-import { Provider } from 'react-redux';
+import { Provider, connect } from 'react-redux';
 import Oidc from 'oidc-client';
+
 import './App.css';
 import LoginPage from './LoginPage.js';
 import ConsentPage from './ConsentPage.js';
@@ -18,13 +19,18 @@ import {
   cardSearchReducer,
   cardDetailReducer,
   backendStateReducer,
+  userReducer,
 } from './ReduxReducers.js';
+import {
+  setLoggedInUser,
+} from './ReduxActions.js';
 
 function App() {
   const rootReducer = combineReducers({
     cardSearch: cardSearchReducer,
     cardDetail: cardDetailReducer,
-    backendState: backendStateReducer,
+    backend: backendStateReducer,
+    user: userReducer,
   });
   const reduxStore = createStore(rootReducer);
 
@@ -32,11 +38,17 @@ function App() {
     <div className="App">
       <Provider store={reduxStore}>
         <Router>
-          <MTGOrganizer />
+          <MTGOrganizerWidget />
         </Router>
       </Provider>
     </div>
   );
+}
+
+const mapStateToProps = (state) => {
+  return {
+    user: state.user.user,
+  };
 }
 
 class MTGOrganizer extends React.Component {
@@ -52,18 +64,13 @@ class MTGOrganizer extends React.Component {
     }
 
     this.userManager = new Oidc.UserManager(this.authConfig);
-
-    this.state = {
-      loggedIn: false,
-      user: null,
-    };
   }
 
   componentDidMount() {
     this.userManager.getUser().then((user) => {
       if(user) {
         console.log("Logged in user ", user);
-        this.setState({loggedIn: true, user: user});
+        this.props.dispatch(setLoggedInUser(user));
       } else {
         console.log("No user logged in");
       }
@@ -71,7 +78,7 @@ class MTGOrganizer extends React.Component {
   }
 
   render() {
-    if (!this.state.loggedIn) {
+    if (!this.props.user) {
       return (
         <Switch>
           <Route path="/auth/login">
@@ -84,23 +91,21 @@ class MTGOrganizer extends React.Component {
             <LogoutPage />
           </Route>
           <Route path="/auth_callback">
-            <AuthCallbackHandler
-              userManager={this.userManager} />
+            <AuthCallbackHandler userManager={this.userManager} />
           </Route>
           <Route path="/">
-            <FrontPageLoggedOut
-              userManager={this.userManager} />
+            <FrontPageLoggedOut userManager={this.userManager} />
           </Route>
         </Switch>
       );
     } else {
       return (
-        <FrontPageLoggedIn
-          userManager={this.userManager}
-          reduxStore={this.props.reduxStore} />
+        <FrontPageLoggedIn userManager={this.userManager} />
       );
     }
   }
 }
+
+const MTGOrganizerWidget = connect(mapStateToProps)(MTGOrganizer);
 
 export default App;

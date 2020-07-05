@@ -1,5 +1,8 @@
 import React from 'react';
-import {withRouter} from 'react-router-dom';
+import { withRouter } from 'react-router-dom';
+import { connect } from 'react-redux';
+
+import { setLoggedInUser } from './ReduxActions.js';
 
 class AuthCallbackHandler extends React.Component {
   constructor(props) {
@@ -24,6 +27,7 @@ class AuthCallbackHandler extends React.Component {
       this.props.userManager.signinRedirectCallback().then((user) => {
         console.log("Completed auth callback");
         console.log(user);
+        this.props.dispatch(setLoggedInUser(user));
         this.props.history.replace("/");
       });
       this.setState({
@@ -51,4 +55,4 @@ class AuthCallbackHandler extends React.Component {
   }
 }
 
-export default withRouter(AuthCallbackHandler);
+export default connect()(withRouter(AuthCallbackHandler));

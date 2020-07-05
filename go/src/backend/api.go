@@ -9,9 +9,7 @@ type ResponseType int
 
 const (
     ApiTypesRequest RequestType = iota
-    LoginChallengeCheck
-    ConsentChallengeCheck
-    LoginRequest
+    AuthUserRequest
     CardSearchRequest
     CardDetailRequest
 )
@@ -19,27 +17,21 @@ const (
 const (
     ApiTypesResponse ResponseType = iota
     ErrorResponse
-    LoginChallengeResponse
-    LoginResponse
-    ConsentResponse
+    AuthUserResponse
     CardSearchResponse
     CardDetailResponse
 )
 
 var requestTypes  = [...]RequestType{
     ApiTypesRequest,
-    LoginChallengeCheck,
-    ConsentChallengeCheck,
-    LoginRequest,
+    AuthUserRequest,
     CardSearchRequest,
     CardDetailRequest}
 
 var responseTypes = [...]ResponseType{
     ApiTypesResponse,
     ErrorResponse,
-    LoginChallengeResponse,
-    LoginResponse,
-    ConsentResponse,
+    AuthUserResponse,
     CardSearchResponse,
     CardDetailResponse}
 

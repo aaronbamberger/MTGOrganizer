@@ -12,7 +12,7 @@ import WebsocketHandler from './WebsocketHandler.js';
 
 const mapStateToProps = (state) => {
   return {
-    backendReady: state.backendState.ready,
+    backendReady: state.backend.ready,
   };
 }
 

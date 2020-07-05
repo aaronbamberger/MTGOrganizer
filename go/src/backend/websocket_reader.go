@@ -61,6 +61,10 @@ func HandleApi(resp http.ResponseWriter, req *http.Request) {
     respChan := make(chan ResponseMessage)
     go websocketResponder(conn, doneChan, respChan)
 
+    // We wait for the client to authorize this socket by sending their access token
+    // Before this socket is authorized, we only respond to a limited subset of requests
+    socketAuthorized := false
+
     done := false
     for !done {
         if messageType, reader, err := conn.NextReader(); err != nil {
@@ -85,25 +89,47 @@ func HandleApi(resp http.ResponseWriter, req *http.Request) {
                     log.Print(err)
                     continue
                 }
-                switch message.Type {
-                case ApiTypesRequest:
-                    go apiTypes(doneChan, respChan)
-                case CardSearchRequest:
-                    var searchName string
-                    err = json.Unmarshal([]byte(message.Value), &searchName)
-                    if err != nil {
-                        log.Print(err)
-                        continue
+
+                // Before the socket is authorized, only respond to requests for
+                // API types and to authorize
+                if !socketAuthorized {
+                    switch message.Type {
+                    case ApiTypesRequest:
+                        go apiTypes(doneChan, respChan)
+                    case AuthUserRequest:
+                        var authRequest AuthRequest
+                        err = json.Unmarshal([]byte(message.Value), &authRequest)
+                        if err != nil {
+                            log.Print(err)
+                            continue
+                        }
+                        socketAuthorized = authorizeToken(authRequest.Subject,
+                                authRequest.AuthToken, doneChan, respChan)
+                    default:
+                        log.Printf("Attempt to call API %d on unauthorized socket", message.Type)
                     }
-                    go cardSearch(cardDB, searchName, doneChan, respChan)
-                case CardDetailRequest:
-                    var cardUUID string
-                    err = json.Unmarshal([]byte(message.Value), &cardUUID)
-                    if err != nil {
-                        log.Print(err)
-                        continue
+                } else {
+                    // Don't bother handling API types or auth messages here,
+                    // since the frontend should never send those on an already
+                    // authorized socket
+                    switch message.Type {
+                    case CardSearchRequest:
+                        var searchName string
+                        err = json.Unmarshal([]byte(message.Value), &searchName)
+                        if err != nil {
+                            log.Print(err)
+                            continue
+                        }
+                        go cardSearch(cardDB, searchName, doneChan, respChan)
+                    case CardDetailRequest:
+                        var cardUUID string
+                        err = json.Unmarshal([]byte(message.Value), &cardUUID)
+                        if err != nil {
+                            log.Print(err)
+                            continue
+                        }
+                        go cardDetail(cardDB, cardUUID, doneChan, respChan)
                     }
-                    go cardDetail(cardDB, cardUUID, doneChan, respChan)
                 }
 
             default:

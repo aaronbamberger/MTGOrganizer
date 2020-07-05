@@ -6,7 +6,9 @@ import { REQUEST_CARD_SEARCH_RESULTS,
          CANCEL_CARD_DETAIL_REQUEST,
          UPDATE_BACKEND_CONNECTION_STATE,
          UPDATE_API_TYPES_RECEIVED,
+         SET_AUTH_REQUEST_PENDING,
          UPDATE_AUTH_COMPLETED,
+         SET_LOGGED_IN_USER,
 } from './ReduxActions.js';
 
 const cardSearchDefaultState = {
@@ -64,7 +66,8 @@ export function cardDetailReducer(state = cardDetailDefaultState, action) {
 const backendDefaultState = {
   connected: false,
   apiTypesReceived: false,
-  authCompleted: true,
+  authCompleted: false,
+  authRequestPending: false,
   ready: false,
 }
 
@@ -86,14 +89,34 @@ export function backendStateReducer(state = backendDefaultState, action) {
         ready: ready,
       });
     }
+    case SET_AUTH_REQUEST_PENDING:
+      return Object.assign({}, state, {
+        authRequestPending: true,
+      });
     case UPDATE_AUTH_COMPLETED:
     {
       const ready = action.completed && state.apiTypesReceived && state.connected;
       return Object.assign({}, state, {
         authCompleted: action.completed,
         ready: ready,
+        authRequestPending: false,
       });
     }
+    default:
+      return state;
+  }
+}
+
+const userDefaultState = {
+  user: null,
+}
+
+export function userReducer(state = userDefaultState, action) {
+  switch (action.type) {
+    case SET_LOGGED_IN_USER:
+      return Object.assign({}, state, {
+        user: action.user,
+      });
     default:
       return state;
   }
