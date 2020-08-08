@@ -42,6 +42,9 @@ class CardDetail extends React.Component {
     this.props.dispatch(requestCardDetail(uuid));
   }
 
+  /*
+  */
+
   render() {
     if (this.props.cardDetail) {
       let variations = [ this.props.cardUUID ].concat(this.props.cardDetail.variations);
@@ -63,9 +66,10 @@ class CardDetail extends React.Component {
                   uuid={variationUUID}
                   sizePercent={5} />
               </NavLink>)}
-              &nbsp;
+            &nbsp;
           </div>
         );
+        console.log(variationLinks);
       }
 
       let legalities = null
